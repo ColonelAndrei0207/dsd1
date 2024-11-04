@@ -1,19 +1,9 @@
-/**************************
-  * (C) Copyright 2024 All Rights Reserved
+ /*  GOLDEN MODEL file
+  *  Used for the DSD1 project
   *
-  * MODULE: spi_training_counter
-  * DEVICE: spi_training_counter
-  * PROJECT: SPI SLAVE digital design training
-  * AUTHOR: Colonel Andrei
-  * DATE:
-  * FILE:
-  * REVISION:
-  *
-  * FILE DESCRIPTION: Simple counter that generates a variable that counts the number of sclk pulses, while also sending the pulses_nr_error output
-  *
-  ***************************/
+  */
 
- `include "D:/FACULTATE/MASTER AM/semestrul 1/DSD1/sursa/tema1/golden_model.srcs/sources_1/new/defines.vh"
+ `include "/home/digdevel/training/nodm/default/units/etti_colonel/source/rtl/defines.svh"
 
 
 module seq_core(
@@ -43,7 +33,7 @@ module seq_core(
 	logic [2:0] op_value1 = 0;
 	logic [2:0] op_value2 = 0;
 
-	function instruction_decode (input logic [15:0] instruction_code );
+	task instruction_decode (input logic [15:0] instruction_code );
 
 		static logic  [6:0] t_opcode = 0; //temporary opcode that will be filled
 
@@ -65,110 +55,7 @@ module seq_core(
 			//error
 			$display("%0t weird situation we have here",$time() );
 
-	endfunction
-
-	function operand_choice( input logic [2:0] operand, input bit n);
-
-		reg [`D_BITS - 1 : 0] reg_out;
-
-		if (n == 0) begin
-
-			case (operand)
-
-				`R0:
-				begin
-					reg_out <= gen_reg[0];
-				end
-
-				`R1:
-				begin
-					reg_out <= gen_reg[1];
-				end
-
-				`R2:
-				begin
-					reg_out <= gen_reg[2];
-				end
-
-				`R3:
-				begin
-					reg_out <= gen_reg[3];
-				end
-
-				`R4:
-				begin
-					reg_out <= gen_reg[4];
-				end
-
-				`R5:
-				begin
-					reg_out <= gen_reg[5];
-				end
-
-				`R6:
-				begin
-					reg_out <= gen_reg[6];
-				end
-
-				`R7:
-				begin
-					reg_out <= gen_reg[7];
-				end
-
-				default: reg_out <= reg_out;
-
-			endcase
-		end
-
-		else begin
-			case (operand)
-
-				`R0:
-				begin
-					gen_reg[0] <= reg_out;
-				end
-
-				`R1:
-				begin
-					gen_reg[1] <= reg_out;
-				end
-
-				`R2:
-				begin
-					gen_reg[2] <= reg_out;
-				end
-
-				`R3:
-				begin
-					gen_reg[3] <= reg_out;
-				end
-
-				`R4:
-				begin
-					gen_reg[4] <= reg_out;
-				end
-
-				`R5:
-				begin
-					gen_reg[5] <= reg_out;
-				end
-
-				`R6:
-				begin
-					gen_reg[6] <= reg_out;
-				end
-
-				`R7:
-				begin
-					gen_reg[7] <= reg_out;
-				end
-
-				default: reg_out <= reg_out;
-
-			endcase
-		end
-
-	endfunction
+	endtask
 
 	//main process block
 	always_ff @(posedge clk, negedge rst) begin
@@ -191,17 +78,20 @@ module seq_core(
 		end
 		else begin
 
-			instruction_decode(instruction); //now I have either opcode4, opcode5 or opcode7 (every instruction type implemented
+			instruction_decode(instruction); //now I have either opcode4, opcode5 or opcode7 (every instruction type implemented)
+
 			if (opcode4 !=0) begin
+				
 				case(opcode4)
 					`JMP:   pc[2:0] <= instruction[2:0]; //pc = op0
 					`JMPR:  pc <= pc + instruction[5:0];
+					
 					`JMPC:
 					begin
 						case(instruction[11:9]) //check condition
 							`N:
 							begin
-								if (instruction[8:6] < 0) //
+								if (instruction[8:6] < 0) 
 									pc[2:0] <= instruction[2:0];
 							end
 
@@ -259,117 +149,36 @@ module seq_core(
 			end //condition in place in order to skip the case statement
 
 
-    //TODO: modify the LOAD instruction in order to actually get the right address, as well as load the proper register
 			if (opcode5 !=0) begin
 				case(opcode5)
 
-					/*we are loading into an internal register; we need address -> "Only the last A_BITS of R[op1] are used as memory address"
-					 * reg0[2:0] aka op1 will get us the actual register (R1, R2...)
-					 * now that we have the register; we send it as per the description (write into data_out)
-
-					 */
 					`LOAD:
 					begin
-					  static logic [`D_BITS - 1 : 0] reg_out0 = 0;
-					  static logic [`D_BITS - 1 : 0] reg_out1 = 0;
-					  
-					  reg_out0 = operand_choice(instruction[10:8], 0 ).reg_out;
-					  reg_out1 = operand_choice(instruction[2:0], 0 ).reg_out;
-					  
-					  reg_out0 <= data_in;
-					  address <= reg_out1[ `D_BITS - 1 : `D_BITS - `A_BITS];
-					  pc <= pc + 1;
-					  					  					  
-					  operand_choice(instruction [10:8], 1).reg_out = reg_out0; //here we reput the value of register of op0 back to its place    
+						gen_reg[instruction[10:8]] <= data_in;
+						address <= gen_reg[ instruction[2:0] ] [ `D_BITS - 1 : `D_BITS - `A_BITS];
+						pc <= pc + 1;
+						read <=1;
 
 					end//endload
 
 					`LOADC:
-					/*
-					 * into a register set by op0, we will load the constant;
-					 * first we will shift to the left with 8 bits so that we can load said constant to the LSBs
-					 */
+
 					begin
-						case (instruction[10:8])
-							`R0:
-							begin
-								gen_reg[0] <= gen_reg[0] << 8;
-								gen_reg[0][7:0] <= instruction[7:0];
-								pc <= pc + 1;
 
-							end
-
-							`R1:
-							begin
-								gen_reg[1] <= gen_reg[1] << 8;
-								gen_reg[1][7:0] <= instruction[7:0];
-								pc <= pc + 1;
-							end
-
-							`R2:
-							begin
-								gen_reg[2] <= gen_reg[2] << 8;
-								gen_reg[2][7:0] <= instruction[7:0];
-								pc <= pc + 1;
-							end
-
-							`R3:
-							begin
-								gen_reg[3] <= gen_reg[3] << 8;
-								gen_reg[3][7:0] <= instruction[7:0];
-								pc <= pc + 1;
-							end
-
-							`R4:
-							begin
-								gen_reg[4] <= gen_reg[4] << 8;
-								gen_reg[4][7:0] <= instruction[7:0];
-								pc <= pc + 1;
-							end
-
-							`R5:
-							begin
-								gen_reg[5] <= gen_reg[5] << 8;
-								gen_reg[5][7:0] <= instruction[7:0];
-								pc <= pc + 1;
-							end
-
-							`R6:
-							begin
-								gen_reg[6] <= gen_reg[6] << 8;
-								gen_reg[6][7:0] <= instruction[7:0];
-								pc <= pc + 1;
-							end
-
-							`R7:
-							begin
-								gen_reg[7] <= gen_reg[7] << 8;
-								gen_reg[7][7:0] <= instruction[7:0];
-								pc <= pc + 1;
-							end
-
-							default: pc <= pc;
-
-						endcase
+						gen_reg[instruction[10:8]] <= gen_reg[ instruction[10:8] ] << 8;
+						gen_reg[instruction[10:8]][7:0] <= instruction[7:0];
+						pc <= pc + 1;
+//						read <=1;
 
 					end
 
 					`STORE:
-					/* with op0 we will get the address, with op1 we will get both the said register and data_out
-					 *TODO: register find through task (need both register for op0 and for op1
-					 */
-					     //TODO: modify the STORE instruction in order to actually get the right address, as well as load the proper register
 					begin
-					
-					  static logic [`D_BITS - 1 : 0] reg_out0 = 0;
-					  static logic [`D_BITS - 1 : 0] reg_out1 = 0;
-					  
-					  reg_out0 = operand_choice(instruction[10:8], 0 ).reg_out;
-					  reg_out1 = operand_choice(instruction[2:0], 0 ).reg_out;
-					  
-					  data_out <= reg_out1;
-					  address <= reg_out0[ `D_BITS - 1 : `D_BITS - `A_BITS];
-					  pc <= pc + 1;					  					  
+
+						data_out <= gen_reg[ instruction[2:0] ];
+						address <= gen_reg[ instruction[10:8] ][ `D_BITS - 1 : `D_BITS - `A_BITS];
+						pc <= pc + 1;
+						write <= 1;
 
 					end
 
@@ -384,71 +193,33 @@ module seq_core(
 
 					`ADD:
 					begin
-						static logic [`D_BITS - 1 : 0] reg_out0 = 0;
-						static logic [`D_BITS - 1 : 0] reg_out1 = 0;
-						static logic [`D_BITS - 1 : 0] reg_out2 = 0;
 
-						reg_out0 = operand_choice(instruction[8:6], 0 ).reg_out;
-						reg_out1 = operand_choice(instruction[5:3], 0 ).reg_out;
-						reg_out2 = operand_choice(instruction[2:0], 0 ).reg_out;
-
-						reg_out0 = reg_out1 + reg_out2;
+						gen_reg [ instruction[8:6] ] <= gen_reg [ instruction[5:3] ] + gen_reg [ instruction[2:0] ];
 						pc <= pc+1;
-
-						operand_choice(instruction [8:6], 1).reg_out = reg_out0; //here we reput the value of register of op0 back to its place
 
 					end
 
 					`ADDF:
-					begin
+					begin	//currently no need for floating point
 
-						static logic [`D_BITS - 1 : 0] reg_out0 = 0;
-						static logic [`D_BITS - 1 : 0] reg_out1 = 0;
-						static logic [`D_BITS - 1 : 0] reg_out2 = 0;
-
-						reg_out0 = operand_choice(instruction[8:6], 0 ).reg_out;
-						reg_out1 = operand_choice(instruction[5:3], 0 ).reg_out;
-						reg_out2 = operand_choice(instruction[2:0], 0 ).reg_out;
-
-						reg_out0 = reg_out1 + reg_out2;
+						gen_reg [ instruction[8:6] ] <= gen_reg [ instruction[5:3] ] + gen_reg [ instruction[2:0] ];
 						pc <= pc+1;
-
-						operand_choice(instruction [8:6], 1).reg_out = reg_out0; //here we reput the value of register of op0 back to its place
 
 					end
 
 
 					`SUB:
 					begin
-						static logic [`D_BITS - 1 : 0] reg_out0 = 0;
-						static logic [`D_BITS - 1 : 0] reg_out1 = 0;
-						static logic [`D_BITS - 1 : 0] reg_out2 = 0;
 
-						reg_out0 = operand_choice(instruction[8:6], 0 ).reg_out;
-						reg_out1 = operand_choice(instruction[5:3], 0 ).reg_out;
-						reg_out2 = operand_choice(instruction[2:0], 0 ).reg_out;
-
-						reg_out0 = reg_out1 - reg_out2;
+						gen_reg [ instruction[8:6] ] <= gen_reg [ instruction[5:3] ] - gen_reg [ instruction[2:0] ];
 						pc <= pc+1;
-
-						operand_choice(instruction [8:6], 1).reg_out = reg_out0; //here we reput the value of register of op0 back to its place
 					end
 
 					`SUBF:
-					begin
+					begin	//currently no need for floating point
 
-						static logic [`D_BITS - 1 : 0] reg_out0 = 0;
-						static logic [`D_BITS - 1 : 0] reg_out1 = 0;
-						static logic [`D_BITS - 1 : 0] reg_out2 = 0;
-
-						reg_out0 = operand_choice(instruction[8:6], 0 ).reg_out;
-						reg_out1 = operand_choice(instruction[5:3], 0 ).reg_out;
-						reg_out2 = operand_choice(instruction[2:0], 0 ).reg_out;
-
-						reg_out0 = reg_out1 - reg_out2;
+						gen_reg [ instruction[8:6] ] <= gen_reg [ instruction[5:3] ] - gen_reg [ instruction[2:0] ];
 						pc <= pc+1;
-
-						operand_choice(instruction [8:6], 1).reg_out = reg_out0; //here we reput the value of register of op0 back to its place
 
 					end
 
@@ -456,54 +227,25 @@ module seq_core(
 					`AND:
 					begin
 
-						static logic [`D_BITS - 1 : 0] reg_out0 = 0;
-						static logic [`D_BITS - 1 : 0] reg_out1 = 0;
-						static logic [`D_BITS - 1 : 0] reg_out2 = 0;
 
-						reg_out0 = operand_choice(instruction[8:6], 0 ).reg_out;
-						reg_out1 = operand_choice(instruction[5:3], 0 ).reg_out;
-						reg_out2 = operand_choice(instruction[2:0], 0 ).reg_out;
-
-						reg_out0 = reg_out1 & reg_out2;
+						gen_reg [ instruction[8:6] ] <= gen_reg [ instruction[5:3] ] & gen_reg [ instruction[2:0] ];
 						pc <= pc+1;
-
-						operand_choice(instruction [8:6], 1).reg_out = reg_out0; //here we reput the value of register of op0 back to its place
 
 					end
 
 					`OR:
 					begin
 
-						static logic [`D_BITS - 1 : 0] reg_out0 = 0;
-						static logic [`D_BITS - 1 : 0] reg_out1 = 0;
-						static logic [`D_BITS - 1 : 0] reg_out2 = 0;
-
-						reg_out0 = operand_choice(instruction[8:6], 0 ).reg_out;
-						reg_out1 = operand_choice(instruction[5:3], 0 ).reg_out;
-						reg_out2 = operand_choice(instruction[2:0], 0 ).reg_out;
-
-						reg_out0 = reg_out1 | reg_out2;
+						gen_reg [ instruction[8:6] ] <= gen_reg [ instruction[5:3] ] | gen_reg [ instruction[2:0] ];
 						pc <= pc+1;
-
-						operand_choice(instruction [8:6], 1).reg_out = reg_out0; //here we reput the value of register of op0 back to its place
 
 					end
 
 					`XOR:
 					begin
 
-						static logic [`D_BITS - 1 : 0] reg_out0 = 0;
-						static logic [`D_BITS - 1 : 0] reg_out1 = 0;
-						static logic [`D_BITS - 1 : 0] reg_out2 = 0;
-
-						reg_out0 = operand_choice(instruction[8:6], 0 ).reg_out;
-						reg_out1 = operand_choice(instruction[5:3], 0 ).reg_out;
-						reg_out2 = operand_choice(instruction[2:0], 0 ).reg_out;
-
-						reg_out0 = reg_out1 ^ reg_out2;
+						gen_reg [ instruction[8:6] ] <= gen_reg [ instruction[5:3] ] ^ gen_reg [ instruction[2:0] ];
 						pc <= pc+1;
-
-						operand_choice(instruction [8:6], 1).reg_out = reg_out0; //here we reput the value of register of op0 back to its place
 
 					end
 
@@ -511,96 +253,48 @@ module seq_core(
 					`NAND:
 					begin
 
-						static logic [`D_BITS - 1 : 0] reg_out0 = 0;
-						static logic [`D_BITS - 1 : 0] reg_out1 = 0;
-						static logic [`D_BITS - 1 : 0] reg_out2 = 0;
-
-						reg_out0 = operand_choice(instruction[8:6], 0 ).reg_out;
-						reg_out1 = operand_choice(instruction[5:3], 0 ).reg_out;
-						reg_out2 = operand_choice(instruction[2:0], 0 ).reg_out;
-
-						reg_out0 = ~(reg_out1 & reg_out2);
+						gen_reg [ instruction[8:6] ] <= ~(gen_reg [ instruction[5:3] ] & gen_reg [ instruction[2:0] ] );
 						pc <= pc+1;
-
-						operand_choice(instruction [8:6], 1).reg_out = reg_out0; //here we reput the value of register of op0 back to its place
 
 					end
 
 					`NOR:
 					begin
 
-						static logic [`D_BITS - 1 : 0] reg_out0 = 0;
-						static logic [`D_BITS - 1 : 0] reg_out1 = 0;
-						static logic [`D_BITS - 1 : 0] reg_out2 = 0;
-
-						reg_out0 = operand_choice(instruction[8:6], 0 ).reg_out;
-						reg_out1 = operand_choice(instruction[5:3], 0 ).reg_out;
-						reg_out2 = operand_choice(instruction[2:0], 0 ).reg_out;
-
-						reg_out0 = ~(reg_out1 | reg_out2);
+						gen_reg [ instruction[8:6] ] <= ~(gen_reg [ instruction[5:3] ] | gen_reg [ instruction[2:0] ] );
 						pc <= pc+1;
-
-						operand_choice(instruction [8:6], 1).reg_out = reg_out0; //here we reput the value of register of op0 back to its place
 
 					end
 
 					`NXOR:
 					begin
 
-						static logic [`D_BITS - 1 : 0] reg_out0 = 0;
-						static logic [`D_BITS - 1 : 0] reg_out1 = 0;
-						static logic [`D_BITS - 1 : 0] reg_out2 = 0;
-
-						reg_out0 = operand_choice(instruction[8:6], 0 ).reg_out;
-						reg_out1 = operand_choice(instruction[5:3], 0 ).reg_out;
-						reg_out2 = operand_choice(instruction[2:0], 0 ).reg_out;
-
-						reg_out0 = ~(reg_out1 ^ reg_out2);
+						gen_reg [ instruction[8:6] ] <= ~(gen_reg [ instruction[5:3] ] ^ gen_reg [ instruction[2:0] ] );
 						pc <= pc+1;
-
-						operand_choice(instruction [8:6], 1).reg_out = reg_out0; //here we reput the value of register of op0 back to its place
 
 					end
 
 
 					`SHIFTR:
 					begin
-						static logic [`D_BITS - 1 : 0] reg_out0 = 0;
 
-
-						reg_out0 = operand_choice(instruction[8:6], 0 ).reg_out;
-
-						reg_out0 = reg_out0 >> instruction[5:0];
+						gen_reg[ instruction[8:6] ] <= gen_reg[ instruction[8:6] ] >> instruction[5:0];
 						pc <= pc+1;
 
-						operand_choice(instruction [8:6], 1).reg_out = reg_out0; //here we reput the value of register of op0 back to its place
 					end
 
 					`SHIFTRA:
 					begin
-						static logic [`D_BITS - 1 : 0] reg_out0 = 0;
-						static logic msb;
-						reg_out0 = operand_choice(instruction[8:6], 0 ).reg_out;
-						
-						msb = reg_out0[31]; //save the sign bit inside the "msb" variable
-						reg_out0[31] = 0; 
-
-						reg_out0 = reg_out0 >> instruction[5:0]; //perform the shifting as normal
+						gen_reg[ instruction[8:6] ] <= gen_reg[ instruction[8:6] ] >>> instruction[5:0];
 						pc <= pc+1;
-						reg_out0[31] = msb; //overwrite the sign bit, back to it's original value
 
-						operand_choice(instruction [8:6], 1).reg_out = reg_out0; //here we reput the value of register of op0 back to its place
 					end
 
 					`SHIFTL:
 					begin
-						static logic [`D_BITS - 1 : 0] reg_out0 = 0;
-						reg_out0 = operand_choice(instruction[8:6], 0 ).reg_out;
 
-						reg_out0 = reg_out0 << instruction[5:0];
+						gen_reg[ instruction[8:6] ] <= gen_reg[ instruction[8:6] ] << instruction[5:0];
 						pc <= pc+1;
-
-						operand_choice(instruction [8:6], 1).reg_out = reg_out0; //here we reput the value of register of op0 back to its place
 					end
 				endcase
 			end
