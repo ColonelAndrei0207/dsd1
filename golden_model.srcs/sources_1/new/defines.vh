@@ -56,7 +56,7 @@
    
  `define LOAD 		5'b10001 
  `define LOADC 		5'b10010  
- `define STORE 		5'b10100  
+ `define STORE 		5'b10011  
  
 //4 bits instructions
 
