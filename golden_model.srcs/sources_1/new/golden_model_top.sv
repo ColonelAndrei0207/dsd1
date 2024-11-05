@@ -149,7 +149,7 @@ module seq_core(
 			end //condition in place in order to skip the case statement
 
 
-			if (opcode5 !=0) begin
+			else if (opcode5 !=0) begin
 				case(opcode5)
 
 					`LOAD:
@@ -168,7 +168,6 @@ module seq_core(
 						gen_reg[instruction[10:8]] <= gen_reg[ instruction[10:8] ] << 8;
 						gen_reg[instruction[10:8]][7:0] <= instruction[7:0];
 						pc <= pc + 1;
-//						read <=1;
 
 					end
 
@@ -185,7 +184,7 @@ module seq_core(
 				endcase
 
 			end
-			if (opcode7 != 0) begin
+			else if (opcode7 != 0) begin
 				case(opcode7)
 
 					`NOP: pc <= pc + 1;
@@ -298,6 +297,10 @@ module seq_core(
 					end
 				endcase
 			end
+			
+			else begin				
+					//no decoded opcode				
+			end			
 		end
 	end
 endmodule
