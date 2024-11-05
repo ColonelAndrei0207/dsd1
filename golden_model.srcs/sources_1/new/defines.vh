@@ -1,17 +1,8 @@
-/**************************
-  * (C) Copyright 2024 All Rights Reserved
-  *
-  * MODULE: 
-  * DEVICE: SIMPLE RISC PROCESSOR
-  * PROJECT: DSD Project
-  * AUTHOR: Colonel Andrei
-  * DATE:
-  * FILE:
-  * REVISION:
+ /******************************************************************************
   *
   * FILE DESCRIPTION: Define file with macros included in the design of the RISC processor
   *
-  ***************************/
+  *******************************************************************************/
 
 //1. MAIN PARAMETERS
  
@@ -39,40 +30,40 @@
 
 //NOP & HALT
  `define NOP 		7'b0000000
- `define HALT 		7'b1000000
+ `define HALT 		7'b1111111
 
 //7 bits instructions
- `define ADD 		7'b0010100
- `define ADDF 		7'b0010011
+ `define ADD 		7'b0000001
+ `define ADDF 		7'b0000010
  
- `define SUB 		7'b0010010 
- `define SUBF 		7'b0010001 
+ `define SUB 		7'b0000011 
+ `define SUBF 		7'b0000100 
  
- `define AND 		7'b0010000 
- `define OR 		7'b0001111 
- `define XOR 		7'b0001110 
+ `define AND 		7'b0000101 
+ `define OR 		7'b0000110 
+ `define XOR 		7'b0000111 
  
- `define NAND 		7'b0001101 
- `define NOR 		7'b0001100 
- `define NXOR 		7'b0001011  
+ `define NAND 		7'b0001000 
+ `define NOR 		7'b0001001 
+ `define NXOR 		7'b0001010  
  
- `define SHIFTR 	7'b0001010 
- `define SHIFTRA 	7'b0001001  
- `define SHIFTL 	7'b0001000 
+ `define SHIFTR 	7'b0001011 
+ `define SHIFTRA 	7'b0001100  
+ `define SHIFTL 	7'b0001101 
  
  
 //5 bits instruction
  
- `define LOAD 		5'b00101 
- `define LOADC 		5'b00110  
- `define STORE 		5'b00111  
+ `define LOAD 		5'b10010 
+ `define LOADC 		5'b10001  
+ `define STORE 		5'b10100  
  
 //4 bits instructions
 
- `define JMP 		4'b0001 
- `define JMPR 		4'b0010  
- `define JMPC 		4'b0011 
- `define JMPRC 		4'b0100 
+ `define JMP 		4'b1011 
+ `define JMPR 		4'b1100  
+ `define JMPC 		4'b1101 
+ `define JMPRC 		4'b1110 
 
  
 //5.1. conditional jump conditions
@@ -81,3 +72,4 @@
  `define NN	3'b001
  `define Z 	3'b010
  `define NZ 3'b011
+ 
