@@ -1,6 +1,5 @@
  /*  GOLDEN MODEL file
   *  Used for the DSD1 project
-  *
   */
 
  `include "/home/digdevel/training/nodm/default/units/etti_colonel/source/rtl/defines.svh"
@@ -23,8 +22,9 @@ module seq_core(
 
 //register delcaration
 
-	reg [`D_BITS - 1 : 0] gen_reg [0:7] ;
-
+	reg [`D_BITS - 1 : 0] gen_reg [0:7] ; //internal register declaration
+	
+	//variables used in order to select the instruction type based on the number of bits needed inside the instruction
 	logic [6:0] opcode7 = 0; //used in order to select the intruction type basen on the number of bits needed inside the instruction
 	logic [4:0] opcode5 = 0;
 	logic [3:0] opcode4 = 0;
@@ -33,28 +33,29 @@ module seq_core(
 	logic [2:0] op_value1 = 0;
 	logic [2:0] op_value2 = 0;
 
+	//task used to decode the instruction type, based on the opcode and define's list
 	task instruction_decode (input logic [15:0] instruction_code );
 
-		static logic  [6:0] t_opcode = 0; //temporary opcode that will be filled
-
 		opcode7 = 0;
-		opcode4 = 0;
 		opcode5 = 0;
+		opcode4 = 0;
 
-		t_opcode = instruction_code[15:9]; //we set into the temporary variable the presumed operation code
-
-		if ((t_opcode == 0) && (t_opcode == 7'b1111111) ) //if we have NOP or HALT
-			opcode7 = t_opcode;
-		else if ( (t_opcode >= 7'b0000001 ) && ( t_opcode <= 7'b0001101 ) ) //if we have logical and arithmetical instructions
-			opcode7 = t_opcode;
-		else if (( t_opcode >= 7'b1000100 ) && ( t_opcode <= 7'b1001100) ) //if we have LOAD(C)/STORE instructions
-			opcode5 = t_opcode[6:2];
-		else if (( t_opcode >= 7'b1011000 ) && ( t_opcode <= 7'b1110000 ) ) //if we have logical and arithmetical instructions
-			opcode4 = t_opcode[6:3];
-		else 
+		if ((instruction_code[15:9] == 0) && (instruction_code[15:9] == 7'b1111111) ) begin //if we have NOP or HALT
+			opcode7 = instruction_code[15:9];
+		end
+		else if ( (instruction_code[15:9] >= 7'b0000001 ) && ( instruction_code[15:9] <= 7'b0001101 ) ) begin //if we have logical and arithmetical instructions
+			opcode7 = instruction_code[15:9];
+		end
+		else if (( instruction_code[15:9] >= 7'b1000100 ) && ( instruction_code[15:9] <= 7'b1001100) ) begin //if we have LOAD(C)/STORE instructions
+			opcode5 = instruction_code[15:11];
+		end
+		else if (( instruction_code[15:9] >= 7'b1011000 ) && ( instruction_code[15:9] <= 7'b1110000 ) ) begin //if we have JUMP instructions
+			opcode4 = instruction_code[15:12];
+		end
+		else begin
 			//error
 			$display("%0t weird situation we have here",$time() );
-
+		end
 	endtask
 
 	//main process block
