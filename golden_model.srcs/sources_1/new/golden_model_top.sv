@@ -78,74 +78,92 @@ module seq_core(
 		end
 		else begin
 
-			instruction_decode(instruction); //now I have either opcode4, opcode5 or opcode7 (every instruction type implemented)
+			instruction_decode(instruction); //now we have either opcode4, opcode5 or opcode7 (every instruction type implemented)
 
 			if (opcode4 !=0) begin
-				
+
 				case(opcode4)
-					`JMP:   pc[2:0] <= instruction[2:0]; //pc = op0
+					`JMP:   pc <= gen_reg[ instruction[2:0] ] [ `D_BITS - 1 : `D_BITS - `A_BITS]; //pc = R[op0]
 					`JMPR:  pc <= pc + instruction[5:0];
-					
+
 					`JMPC:
 					begin
+
 						case(instruction[11:9]) //check condition
 							`N:
 							begin
-								if (instruction[8:6] < 0) 
-									pc[2:0] <= instruction[2:0];
+								if (instruction[8:6] < 0) begin
+									pc <= gen_reg[ instruction[2:0] ] [ `D_BITS - 1 : `D_BITS - `A_BITS]; //pc = R[op1]
+								end
 							end
 
 							`NN:
 							begin
-								if (instruction[8:6] >= 0)
-									pc[2:0] <= instruction[2:0];
+								if (instruction[8:6] >= 0) begin
+									pc <= gen_reg[ instruction[2:0] ] [ `D_BITS - 1 : `D_BITS - `A_BITS]; //pc = R[op1]
+								end
 							end
 
 							`Z:
 							begin
-								if (instruction[8:6] == 0)
-									pc[2:0] <= instruction[2:0];
+								if (instruction[8:6] == 0) begin
+									pc <= gen_reg[ instruction[2:0] ] [ `D_BITS - 1 : `D_BITS - `A_BITS]; //pc = R[op1]
+								end
 							end
 
 							`NZ:
 							begin
-								if (instruction[8:6] != 0)
-									pc[2:0] <= instruction[2:0];
+								if (instruction[8:6] != 0) begin
+									pc <= gen_reg[ instruction[2:0] ] [ `D_BITS - 1 : `D_BITS - `A_BITS]; //pc = R[op1]
+								end
 							end
+							default: pc <= pc;
+
 						endcase
+
 					end
 
 					`JMPRC:
 					begin
+
 						case(instruction[11:9]) //check condition
 							`N:
 							begin
-								if (instruction[8:6] < 0)
+								if (instruction[8:6] < 0) begin
 									pc <= pc + instruction[5:0];
+								end
 							end
 
 							`NN:
 							begin
-								if (instruction[8:6] >= 0)
+								if (instruction[8:6] >= 0) begin
 									pc <= pc + instruction[5:0];
+								end
 							end
 
 							`Z:
 							begin
-								if (instruction[8:6] == 0)
+								if (instruction[8:6] == 0) begin
 									pc <= pc + instruction[5:0];
+								end
 							end
 
 							`NZ:
 							begin
-								if (instruction[8:6] != 0)
+								if (instruction[8:6] != 0) begin
 									pc <= pc + instruction[5:0];
+								end
 							end
+
+							default: pc <= pc;
 						endcase
+
 					end
 
 					default: pc <= pc;
+
 				endcase //endcase for opcode4
+
 			end //condition in place in order to skip the case statement
 
 
@@ -155,7 +173,7 @@ module seq_core(
 					`LOAD:
 					begin
 						gen_reg[instruction[10:8]] <= data_in;
-						address <= gen_reg[ instruction[2:0] ] [ `D_BITS - 1 : `D_BITS - `A_BITS];
+						address <= gen_reg[ instruction[2:0] ] [ `A_BITS-1:0 ];
 						pc <= pc + 1;
 						read <=1;
 
@@ -175,11 +193,12 @@ module seq_core(
 					begin
 
 						data_out <= gen_reg[ instruction[2:0] ];
-						address <= gen_reg[ instruction[10:8] ][ `D_BITS - 1 : `D_BITS - `A_BITS];
+						address <= gen_reg[ instruction[10:8] ][ `A_BITS-1:0];
 						pc <= pc + 1;
 						write <= 1;
-
 					end
+
+					default: pc <= pc;
 
 				endcase
 
@@ -199,7 +218,7 @@ module seq_core(
 					end
 
 					`ADDF:
-					begin	//currently no need for floating point
+					begin   //currently no need for floating point
 
 						gen_reg [ instruction[8:6] ] <= gen_reg [ instruction[5:3] ] + gen_reg [ instruction[2:0] ];
 						pc <= pc+1;
@@ -215,7 +234,7 @@ module seq_core(
 					end
 
 					`SUBF:
-					begin	//currently no need for floating point
+					begin   //currently no need for floating point
 
 						gen_reg [ instruction[8:6] ] <= gen_reg [ instruction[5:3] ] - gen_reg [ instruction[2:0] ];
 						pc <= pc+1;
@@ -295,12 +314,17 @@ module seq_core(
 						gen_reg[ instruction[8:6] ] <= gen_reg[ instruction[8:6] ] << instruction[5:0];
 						pc <= pc+1;
 					end
+
+					default: pc <= pc;
 				endcase
 			end
-			
-			else begin				
-					//no decoded opcode				
-			end			
+
+			else begin
+
+			//no decoded opcode; error/unimplemented operation
+
+			end
+
 		end
 	end
 endmodule
