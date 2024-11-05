@@ -34,7 +34,7 @@ module seq_core(
 	logic [2:0] op_value2 = 0;
 
 	//task used to decode the instruction type, based on the opcode and define's list
-	task instruction_decode (input logic [15:0] instruction_code );
+	function instruction_decode (input logic [15:0] instruction_code );
 
 		opcode7 = 0;
 		opcode5 = 0;
@@ -56,7 +56,7 @@ module seq_core(
 			//error
 			$display("%0t weird situation we have here",$time() );
 		end
-	endtask
+	endfunction
 
 	//main process block
 	always_ff @(posedge clk, negedge rst) begin
