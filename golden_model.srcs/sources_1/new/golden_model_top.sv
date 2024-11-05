@@ -43,15 +43,15 @@ module seq_core(
 
 		t_opcode = instruction_code[15:9]; //we set into the temporary variable the presumed operation code
 
-		if ((t_opcode == 0) && (t_opcode == 128) ) //if we have NOP or HALT
+		if ((t_opcode == 0) && (t_opcode == 7'b1111111) ) //if we have NOP or HALT
 			opcode7 = t_opcode;
-		else if ( (t_opcode > 0 ) && ( t_opcode < 5 ) ) //if we have JMP and derivatives instructions
-			opcode4 = t_opcode[15:12];
-		else if (( t_opcode > 6 ) && ( t_opcode < 8) ) //if we have LOAD(C)/STORE instructions
-			opcode5 = t_opcode[15:11];
-		else if (( t_opcode > 9 ) && ( t_opcode < 21 ) ) //if we have logical and arithmetical instructions
+		else if ( (t_opcode >= 7'b0000001 ) && ( t_opcode <= 7'b0001101 ) ) //if we have logical and arithmetical instructions
 			opcode7 = t_opcode;
-		else if ( (t_opcode > 22) && (t_opcode < 127) )
+		else if (( t_opcode >= 7'b1000100 ) && ( t_opcode <= 7'b1001100) ) //if we have LOAD(C)/STORE instructions
+			opcode5 = t_opcode[6:2];
+		else if (( t_opcode >= 7'b1011000 ) && ( t_opcode <= 7'b1110000 ) ) //if we have logical and arithmetical instructions
+			opcode4 = t_opcode[6:3];
+		else 
 			//error
 			$display("%0t weird situation we have here",$time() );
 
