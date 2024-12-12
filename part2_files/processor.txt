@@ -1,0 +1,108 @@
+ /* main processor architecture file
+  * it includes the 4 level pipeline structure: FETCH, READ, EXECUTE, WRITE BACK
+  * proper design file
+  *
+  *
+  */
+
+ `include "/home/digdevel/training/nodm/default/units/etti_colonel/source/rtl/defines.svh"
+
+
+
+module processor(
+
+		// general
+		input   logic      rst_i,   // active 0
+		input   logic      clk_i,
+		// program memory
+		output  logic [`A_BITS-1:0] pc_o,
+		input   logic        [15:0] instruction_i,
+		// data memory
+		output  logic      read_o,  // active 1
+		output  logic      write_o, // active 1
+		output  logic [`A_BITS-1:0]    address_o,
+		input   logic  [`D_BITS-1:0]    data_in_i,
+		output  logic [`D_BITS-1:0]    data_out_o
+
+	);
+
+	logic [15:0] fetch_instruction_s;
+	logic [15:0] read_instruction_s;
+
+//TODO: add wire dimensions
+	logic [`D_BITS-1:0] processor_result_s;
+	logic [2:0] procesor_dest_s;
+
+	logic [2:0] processor_src_1_s;
+	logic [`D_BITS-1:0] processor_operand_1_s;
+
+	logic [2:0] processor_src_2_s;
+	logic [`D_BITS-1:0] processor_operand_2_s;
+	
+	logic [`D_BITS-1:0] data_1_s;
+	logic [`D_BITS-1:0] data_2_s;
+	logic [6:0] opcode_s;
+
+	stage_fetch fetch(
+		// used for the ProgramCounter
+		.rst_i(rst_i),   // active 0
+		.clk_i(clk_i),
+		.pc_o(pc_o),
+
+		//used to receive the instruction
+		.instruction_i(instruction_i),
+
+
+		.fetch_instruction_o(fetch_instruction_s)
+	);
+
+
+	stage_read read(
+
+		.src_1_o(processor_src_1_s),
+		.operand_1_i(processor_operand_1_s),
+
+
+		.src_2_o(processor_src_2_s),
+		.operand_2_i(processor_operand_2_s),
+
+		.read_instruction_i(read_instruction_s),
+
+		.data_1_o(data_1_s),
+		.data_2_o(data_2_s),
+		.opcode_o(opcode_s)
+	);
+
+	//description of the REGS block
+
+	regs REGS(
+
+
+	);
+
+
+	//description of intermediary Read-Execute Pipeline Register
+
+	stage_execute execute(
+
+
+		.address_o(address_o),
+		.data_out_o(data_out_o)
+
+	);
+
+	//description of intermediary Execute-Write_Back Pipeline Register
+
+	stage_write_back write_back(
+
+		.write_o(),
+		.dest_o(procesor_dest_s),
+		.data_in_i(data_in_i),
+		.result_o(processor_result_s)
+
+	);
+
+
+endmodule
+
+
