@@ -1,0 +1,273 @@
+/*  FILE DESCRIPTION:f _execute stage file
+ *
+ * As described in the document, it will contain 4 pipeline registers, connected using internal wires
+ * For each register (stage of the pipeline) a step of the algorithm will be implemented.
+ *      2 options:
+ *          a) in each always_ff block I process said step
+ *          b) each always_ff block that describes the register is in pair with an always_comb block that processes said step
+ * Main 4 steps are:
+ *  1. comparison
+ *
+ *
+ *
+ *  2. alignment
+ *
+ *
+ *
+ *  3. addition
+ *
+ *
+ *
+ *  4. renormalization
+ *
+ *
+ *
+ *
+ */
+module stage_execute_f(
+
+		//inputs from system
+		input logic clk_i,
+		input logic rst_i,
+
+		//inputs from the READ_EXECUTE pipeline register
+
+		input logic [`D_BITS-1:0] data_1_i,
+		input logic [`D_BITS-1:0] data_2_i,
+		input logic [6:0] opcode_i,
+		input logic [2:0] dest_i,
+
+		//output to the WRITE_BACK stage
+
+		output logic [2:0] dest_o,
+		output logic [`D_BITS-1:0] write_back_result_o
+
+	);
+
+	//intermediary outputs between the 4 internal registers
+
+	//outputs of r1
+	logic [`D_BITS-1:0] data_1_s1;
+	logic [`D_BITS-1:0] data_2_s1;
+	logic [1:0] comparison_s; //result of the comparison; if comparison_s == 1, it means that R1 has the larger exponent, if comparison_s == 2 R2 has the larger exponent, else they are equal
+
+	//outputs of r2
+	logic [`D_BITS-1:0] data_1_s2;
+	logic [`D_BITS-1:0] data_2_s2;
+
+	//outputs of r3
+	logic [2:0] dest_s3;
+	logic [`D_BITS-1:0] write_back_result_s3;
+
+	//outputs of r4
+	logic [2:0] dest_s4;
+	logic [`D_BITS-1:0] write_back_result_s4;
+
+
+
+	//PIPELINE REGISTERS used to implement the action of EXF, as described in the assignment
+
+//r1    ->comparison
+	always_ff @ (posedge clk_i, negedge rst_i) begin
+		if(!rst_i) begin
+
+			data_1_s1 <= 0;
+			data_2_s1 <= 0;
+			comparison_s <= 0;
+
+		end
+		else begin
+
+			if ( data_1_i[`F_E_FLOP] > data_2_i[`F_E_FLOP] ) begin
+
+				comparison_s <= 1;
+				data_1_s1 <= data_1_i;
+				data_2_s1 <= data_2_i;
+			end
+			else if ( data_1_i[`F_E_FLOP] < data_2_i[`F_E_FLOP] ) begin
+
+				comparison_s <= 2;
+				data_1_s1 <= data_1_i;
+				data_2_s1 <= data_2_i;
+
+			end
+
+			else begin
+
+				comparison_s <= 3;
+				data_1_s1 <= data_1_i;
+				data_2_s1 <= data_2_i;
+
+			end
+		end
+	end
+
+
+//r2    ->alignment
+	always_ff @ (posedge clk_i, negedge rst_i) begin
+		if(!rst_i) begin
+
+			data_1_s2 <= 0;
+			data_2_s2 <= 0;
+
+		end
+		else begin
+			if (comparison_s == 0) begin
+
+				data_1_s2 <= data_1_s1;
+				data_2_s2 <= data_2_s1;
+
+			end
+			else if (comparison_s == 1) begin //if R1 has a larger exponent, we need to align R2
+
+				data_1_s2 <= data_1_s1;
+				data_2_s2 <= { 1'b0, data_2_s1[`F_M_FLOP] >> (data_1_s1[`F_E_FLOP] - data_2_s1[`F_E_FLOP] ) };
+
+			end
+			else if (comparison_s == 2) begin //if R2 has a larger exponent, we need to align R1
+
+				data_1_s2 <= { 1'b0, data_1_s1[`F_M_FLOP] >> (data_2_s1[`F_E_FLOP] - data_1_s1[`F_E_FLOP] ) };
+				data_2_s2 <= data_2_s1;
+
+			end
+			else begin
+
+				data_1_s2 <= data_1_s1;
+				data_2_s2 <= data_2_s1;
+
+			end
+		end
+	end
+
+//r3    ->addition
+	always_ff @ (posedge clk_i, negedge rst_i) begin
+		if(!rst_i) begin
+
+			write_back_result_s3 <= 0;
+			dest_s3 <= 0;
+
+		end
+		else begin
+			dest_s3 <= dest_i;
+
+			if ( data_1_s2[31] == data_2_s2[31] ) begin //if both numbers have the same sign
+				if(opcode_i == `ADDF ) begin
+
+					if (comparison_s == 1) begin
+
+						write_back_result_s3 <= { data_1_s2[31], data_1_s2[`F_E_FLOP], data_1_s2[`F_M_FLOP] + data_2_s2[`F_M_FLOP] };
+
+					end
+					else begin
+
+						write_back_result_s3 <= { data_1_s2[31], data_2_s2[`F_E_FLOP], data_1_s2[`F_M_FLOP] + data_2_s2[`F_M_FLOP] };
+
+					end
+				end
+				else if (opcode_i == `SUBF) begin
+
+					if (comparison_s == 1) begin
+
+						write_back_result_s3 <= { data_1_s2[31], data_1_s2[`F_E_FLOP], data_1_s2[`F_M_FLOP] - data_2_s2[`F_M_FLOP] };
+
+					end
+					else begin
+
+						write_back_result_s3 <= { data_1_s2[31], data_2_s2[`F_E_FLOP], data_1_s2[`F_M_FLOP] - data_2_s2[`F_M_FLOP] };
+
+					end
+				end
+			end
+			else begin //if the numbers have a different sign
+
+				if(opcode_i == `ADDF ) begin
+
+					if (comparison_s == 1) begin
+
+						write_back_result_s3 <= { data_1_s2[31], data_1_s2[`F_E_FLOP], data_1_s2[`F_M_FLOP] - data_2_s2[`F_M_FLOP] };
+
+					end
+					else begin
+
+						write_back_result_s3 <= { data_1_s2[31], data_2_s2[`F_E_FLOP], data_1_s2[`F_M_FLOP] - data_2_s2[`F_M_FLOP] };
+
+					end
+				end
+				else if (opcode_i == `SUBF) begin
+
+					if (comparison_s == 1) begin
+
+						write_back_result_s3 <= { data_1_s2[31], data_1_s2[`F_E_FLOP], data_1_s2[`F_M_FLOP] + data_2_s2[`F_M_FLOP] };
+
+					end
+					else begin
+
+						write_back_result_s3 <= { data_1_s2[31], data_2_s2[`F_E_FLOP], data_1_s2[`F_M_FLOP] + data_2_s2[`F_M_FLOP] };
+
+					end
+				end
+			end
+		end
+	end
+
+
+//r4    ->renormalization
+	always_ff @ (posedge clk_i, negedge rst_i) begin
+		if(!rst_i) begin
+
+			write_back_result_s4 <= 0;
+			dest_s4 <= 0;
+
+		end
+		else begin
+			dest_s4 <= dest_s3;
+
+			if(write_back_result_s3[`D_BITS-`SIGN_BITS-`E_BITS-1] == 1) begin
+
+				write_back_result_s4 <= write_back_result_s3;
+
+			end
+			else begin
+
+				write_back_result_s4 <= { write_back_result_s3[`D_BITS-1], write_back_result_s3[`F_E_FLOP]-1, write_back_result_s3[`F_M_FLOP] << 1 };
+
+			end
+		end
+	end
+
+	//PIPELINE REGISTER between EXECUTE and WRITE BACK
+
+//register used to transport dest_o
+	always_ff @ (posedge clk_i, negedge rst_i) begin
+		if(!rst_i) begin
+
+			dest_o <= 0;
+
+		end
+		else begin
+
+			dest_o <= dest_s4;
+
+		end
+	end
+
+//register used to transport write_back_result_o
+	always_ff @ (posedge clk_i, negedge rst_i) begin
+		if(!rst_i) begin
+
+			write_back_result_o <= 0;
+
+		end
+		else begin
+
+			write_back_result_o <= write_back_result_s4;
+
+		end
+	end
+
+
+endmodule
+
+
+
+

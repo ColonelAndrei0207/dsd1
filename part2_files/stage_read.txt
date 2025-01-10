@@ -4,6 +4,13 @@
  */
 module stage_read(
 
+		input logic [`D_BITS-1:0] data_forward_i,
+		input logic  [1:0] flag_forward_i,
+
+		//input from the EXECUTE stage, used to update opcode in case of jump
+
+		input logic [`FLAGS_NR-1:0] execute_fetch_flags_i,
+
 		//i/o ports to and from REGS
 
 		input logic regs_stop_i,
@@ -40,7 +47,7 @@ module stage_read(
 	logic [`D_BITS-1:0] data_1_s;
 
 	//assignation of the intermediary opcode_s variable with it's corresponding place in read_instruction_i
-	assign opcode_s = read_instruction_i[15:9]; 
+	assign opcode_s = read_instruction_i[15:9];
 
 	//always_comb block that deals with the src outputs and dest_s
 	always_comb begin
@@ -67,12 +74,22 @@ module stage_read(
 
 			end
 
-			`LOAD, `STORE:
+			`LOAD:
 			begin
-				src_1_o = read_instruction_i[`F_LS_OP0];
+
+				dest_s = read_instruction_i[`F_LS_OP0];
 				src_2_o = read_instruction_i[`F_LS_OP1];
 				regs_start_o = 1;
 
+
+			end
+
+			`STORE:
+			begin
+
+				src_1_o = read_instruction_i[`F_LS_OP1]; //R[op1] is the register that is being sent to the memory
+				src_2_o = read_instruction_i[`F_LS_OP0]; //R[op0] has it's address taken (it is nedeed fully)
+				regs_start_o = 1;
 
 			end
 
@@ -134,34 +151,105 @@ module stage_read(
 
 		if (regs_stop_i) begin //condition placed in order to ensure that the proper data has been received
 
+
 			casex(read_instruction_i[15:9] )
 				`ADD, `ADDF, `SUB, `SUBF, `AND, `NAND, `OR, `NOR, `XOR, `NXOR:
 				begin
+					if( flag_forward_i == 1 ) begin
 
-					data_1_s = operand_1_i;
-					data_2_s = operand_2_i;
+						data_1_s = data_forward_i;
+						data_2_s = operand_2_i;
+
+					end
+					else if (  flag_forward_i == 2 ) begin
+
+						data_1_s = operand_1_i;
+						data_2_s = data_forward_i;
+
+					end
+					else begin
+
+						data_1_s = operand_1_i;
+						data_2_s = operand_2_i;
+
+					end
+
 
 				end
 
 				`SHIFTL, `SHIFTR, `SHIFTRA:
 				begin
+					if (flag_forward_i == 1) begin
 
-					data_1_s = operand_1_i;
+						data_1_s = data_forward_i;
+
+					end
+					else begin
+
+						data_1_s = operand_1_i;
+
+					end
+
 					data_2_s[5:0] = read_instruction_i[5:0];
 
 				end
 
-				`LOAD, `STORE:
+				`LOAD:
 				begin
-					data_1_s = operand_1_i;
-					data_2_s = operand_2_i;
+					if (flag_forward_i == 2) begin
+
+						data_2_s = data_forward_i;
+
+					end
+					else begin
+
+						data_2_s = operand_2_i;
+
+					end
+
 
 				end
+
+				`STORE:
+				begin
+
+					if( flag_forward_i == 1 ) begin
+
+						data_1_s = data_forward_i;
+						data_2_s = operand_2_i;
+
+					end
+					else if (  flag_forward_i == 2 ) begin
+
+						data_1_s = operand_1_i;
+						data_2_s = data_forward_i;
+
+					end
+					else begin
+
+						data_1_s = operand_1_i;
+						data_2_s = operand_2_i;
+
+					end
+
+				end
+
 
 				`LOADC:
 				begin
 
-					data_1_s = operand_1_i;
+					if (flag_forward_i == 1) begin
+
+						data_1_s = data_forward_i;
+
+					end
+					else begin
+
+						data_1_s = operand_1_i;
+
+					end
+
+
 					data_2_s[`F_LS_CST] = read_instruction_i[`F_LS_CST];
 
 				end
@@ -169,15 +257,40 @@ module stage_read(
 				`JMP:
 				begin
 
-					data_1_s = operand_1_i;
+					if (flag_forward_i == 1) begin
+
+						data_1_s = data_forward_i;
+
+					end
+					else begin
+
+						data_1_s = operand_1_i;
+
+					end
 
 				end
 
 				`JMPC:
 				begin
 
-					data_1_s = operand_1_i;
-					data_2_s = operand_2_i;
+					if( flag_forward_i == 1 ) begin
+
+						data_1_s = data_forward_i;
+						data_2_s = operand_2_i;
+
+					end
+					else if (  flag_forward_i == 2 ) begin
+
+						data_1_s = operand_1_i;
+						data_2_s = data_forward_i;
+
+					end
+					else begin
+
+						data_1_s = operand_1_i;
+						data_2_s = operand_2_i;
+
+					end
 
 
 				end
@@ -193,7 +306,16 @@ module stage_read(
 				`JMPRC:
 				begin
 
-					data_1_s = operand_1_i;
+					if (flag_forward_i == 1) begin
+
+						data_1_s = data_forward_i;
+
+					end
+					else begin
+
+						data_1_s = operand_1_i;
+
+					end
 					data_2_s[`F_JMP_OFF] = read_instruction_i[`F_JMP_OFF];  //the offset
 					data_2_s[8:6] = read_instruction_i [`F_JMP_CND];    //the condition
 
@@ -221,6 +343,7 @@ module stage_read(
 
 
 	//PIPELINE REGISTER between READ stage and EXECUTE stage
+	//TODO: check how JUMP instructions are processed
 
 	//register used to transport opcode_o
 	always_ff @ (posedge clk_i, negedge rst_i) begin
@@ -230,8 +353,19 @@ module stage_read(
 
 		end
 		else begin
+			if ( (execute_fetch_flags_i == `JUMP_SIMPLE) || (execute_fetch_flags_i == `JUMP_ADD) ) begin
+				opcode_o <= 0;
+			end
+			else if (execute_fetch_flags_i == `STOP) begin
 
-			opcode_o <= opcode_s;
+				opcode_o <= opcode_o;
+
+			end
+			else begin
+
+				opcode_o <= opcode_s;
+
+			end
 
 		end
 	end
@@ -245,7 +379,18 @@ module stage_read(
 		end
 		else begin
 
-			dest_o <= dest_s;
+			if ( (execute_fetch_flags_i == `JUMP_SIMPLE) || (execute_fetch_flags_i == `JUMP_ADD) ) begin
+				dest_o <= 0;
+			end
+			else if (execute_fetch_flags_i == `STOP) begin
+
+				dest_o <= dest_o;
+
+			end
+			else begin
+
+				dest_o <= dest_s;
+			end
 
 		end
 	end
@@ -259,7 +404,18 @@ module stage_read(
 		end
 		else begin
 
-			data_1_o <= data_1_s;
+			if ( (execute_fetch_flags_i == `JUMP_SIMPLE) || (execute_fetch_flags_i == `JUMP_ADD) ) begin
+				data_1_o <= 0;
+			end
+			else if (execute_fetch_flags_i == `STOP) begin
+
+				data_1_o <= data_1_o;
+
+			end
+			else begin
+
+				data_1_o <= data_1_s;
+			end
 
 		end
 	end
@@ -273,14 +429,23 @@ module stage_read(
 		end
 		else begin
 
-			data_2_o <= data_2_s;
+			if ( (execute_fetch_flags_i == `JUMP_SIMPLE) || (execute_fetch_flags_i == `JUMP_ADD) ) begin
+				data_2_o <= 0;
+			end
+			else if (execute_fetch_flags_i == `STOP) begin
+
+				data_2_o <= data_2_o;
+
+			end
+			else begin
+
+				data_2_o <= data_2_s;
+			end
 
 		end
 	end
 
 
 endmodule
-
-
 
 

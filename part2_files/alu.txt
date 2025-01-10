@@ -26,6 +26,7 @@ module alu(
 
 		result_o = 0;
 		flags_alu_o = 0;
+		addr_o = 0;
 
 		casex(opcode_i)
 
@@ -33,13 +34,13 @@ module alu(
 			begin
 
 				result_o = operand1_i; //pc = R[op0]
-				flags_alu_o = `JUMP;
+				flags_alu_o = `JUMP_SIMPLE;
 
 			end
 			`JMPR: begin
 
 				result_o[`F_JMP_OFF] = operand1_i[`F_JMP_OFF];
-				flags_alu_o = `JUMP;
+				flags_alu_o = `JUMP_ADD;
 
 			end
 
@@ -52,7 +53,7 @@ module alu(
 						if (operand2_i < 0) begin
 
 							result_o = operand1_i; //pc = R[op1]
-							flags_alu_o = `JUMP;
+							flags_alu_o = `JUMP_SIMPLE;
 
 						end
 					end
@@ -62,7 +63,7 @@ module alu(
 						if (operand2_i >= 0) begin
 
 							result_o = operand1_i; //pc = R[op1]
-							flags_alu_o = `JUMP;
+							flags_alu_o = `JUMP_SIMPLE;
 
 						end
 					end
@@ -72,7 +73,7 @@ module alu(
 						if (operand2_i == 0) begin
 
 							result_o = operand1_i; //pc = R[op1]
-							flags_alu_o = `JUMP;
+							flags_alu_o = `JUMP_SIMPLE;
 
 						end
 					end
@@ -82,7 +83,7 @@ module alu(
 						if (operand2_i != 0) begin
 
 							result_o = operand1_i; //pc = R[op1]
-							flags_alu_o = `JUMP;
+							flags_alu_o = `JUMP_SIMPLE;
 
 						end
 					end
@@ -100,7 +101,7 @@ module alu(
 					begin
 						if (operand1_i < 0) begin
 							result_o[`F_JMP_OFF] =  operand2_i[`F_JMP_OFF];
-							flags_alu_o = `JUMP;
+							flags_alu_o = `JUMP_ADD;
 						end
 					end
 
@@ -108,7 +109,7 @@ module alu(
 					begin
 						if (operand1_i >= 0) begin
 							result_o[`F_JMP_OFF] =  operand2_i[`F_JMP_OFF];
-							flags_alu_o = `JUMP;
+							flags_alu_o = `JUMP_ADD;
 						end
 					end
 
@@ -116,7 +117,7 @@ module alu(
 					begin
 						if (operand1_i == 0) begin
 							result_o[`F_JMP_OFF] =  operand2_i[`F_JMP_OFF];
-							flags_alu_o = `JUMP;
+							flags_alu_o = `JUMP_ADD;
 						end
 					end
 
@@ -124,7 +125,7 @@ module alu(
 					begin
 						if (operand1_i != 0) begin
 							result_o[`F_JMP_OFF] =  operand2_i[`F_JMP_OFF];
-							flags_alu_o = `JUMP;
+							flags_alu_o = `JUMP_ADD;
 						end
 					end
 
@@ -136,7 +137,7 @@ module alu(
 
 			`LOAD:
 			begin
-				result_o = operand1_i;
+				result_o = operand1_i; //we will have the dest_o that is used by WRITE_BACK to send info to the REGS
 				addr_o = operand2_i[ `A_BITS-1:0 ];
 				flags_alu_o = `READ;
 
@@ -145,9 +146,8 @@ module alu(
 			`STORE:
 			begin
 
-				result_o = operand1_i;
 				addr_o = operand2_i[ `A_BITS-1:0];
-				flags_alu_o = `WRITE;
+				flags_alu_o = `WRITE_MEM;
 
 			end
 
@@ -282,5 +282,3 @@ module alu(
 
 
 endmodule
-
-

@@ -4,9 +4,7 @@
   *
   *
   */
-
  `include "/home/digdevel/training/nodm/default/units/etti_colonel/source/rtl/defines.svh"
-
 
 
 module processor(
@@ -26,83 +24,382 @@ module processor(
 
 	);
 
-	logic [15:0] fetch_instruction_s;
-	logic [15:0] read_instruction_s;
+	//wires used to connect the stages modules between themselves
 
-//TODO: add wire dimensions
-	logic [`D_BITS-1:0] processor_result_s;
-	logic [2:0] procesor_dest_s;
+	//wire used to transport flags to the rest of the stages(important when JUMP instructions are executed)
+	logic [`FLAGS_NR-1:0] processor_flags_w;
 
-	logic [2:0] processor_src_1_s;
-	logic [`D_BITS-1:0] processor_operand_1_s;
+	//connections between fetch and read
+	logic [15:0] fetch_read_instruction_w;
 
-	logic [2:0] processor_src_2_s;
-	logic [`D_BITS-1:0] processor_operand_2_s;
-	
-	logic [`D_BITS-1:0] data_1_s;
-	logic [`D_BITS-1:0] data_2_s;
-	logic [6:0] opcode_s;
+	//connections between fetch and execute
+	logic [`A_BITS-1:0] execute_fetch_jump_value_w;
+	//  logic [`FLAGS_NR-1:0] execute_write_back_flags_w;
+
+	//connections between regs and read
+	logic regs_stop_w;
+	logic regs_start_w;
+
+	logic [2:0] regs_src_1_w;
+	logic [`D_BITS-1:0] regs_operand_1_w;
+
+	logic [2:0] regs_src_2_w;
+	logic [`D_BITS-1:0] regs_operand_2_w;
+
+
+	//outputs of the READ stage that go into the combinational block for redirecting to the proper execute path
+	logic [2:0] read_dest_w;
+	logic [`D_BITS-1:0] read_data_1_w;
+	logic [`D_BITS-1:0] read_data_2_w;
+	logic [6:0] read_opcode_w;
+
+
+	//connections between read and execute
+	logic [2:0] read_execute_dest_w;
+	logic [`D_BITS-1:0] read_execute_data_1_w;
+	logic [`D_BITS-1:0] read_execute_data_2_w;
+	logic [6:0] read_execute_opcode_w;
+
+	//connections between read and execute_f
+	logic [2:0] read_execute_f_dest_w;
+	logic [`D_BITS-1:0] read_execute_f_data_1_w;
+	logic [`D_BITS-1:0] read_execute_f_data_2_w;
+	logic [6:0] read_execute_f_opcode_w;
+
+
+	//connections between execute and write_back
+	logic [`D_BITS-1:0] execute_write_back_result_w;
+	logic [2:0] execute_write_back_dest_w;
+
+	//connections between execute_f and write_back
+	logic [2:0] execute_f_write_back_dest_w;
+	logic [`D_BITS-1:0] execute_f_write_back_result_w;
+
+	//connections between the output of the decision_taking block between the execute(_f) and write back stage(s)
+	logic [2:0] write_back_dest_w;
+	logic [`D_BITS-1:0] write_back_result_w;
+
+
+	//connections between write_back and regs
+	logic [`D_BITS-1:0] write_back_regs_result_w;
+	logic [2:0] write_back_regs_dest_w;
+	logic write_back_regs_wen_w;
+
+
+	//variables used to generate and connect the stalling flag between the stalling logic and the stages
+	logic stall_s;
+
+
+	//variable used to connect the flags for data_forwarding to the READ stage
+	logic [1:0] flag_forward_w;
+	logic [`D_BITS-1:0] data_forward_w;
+
+	//intermediary wire used for the multiplexers that connect the READ stage with the EXECUTE or F_EXECUTE stages and for the connection between the WRITE_BACK stage and the execution stages
+	logic opcode_diferent_w;
+
+
 
 	stage_fetch fetch(
 		// used for the ProgramCounter
 		.rst_i(rst_i),   // active 0
 		.clk_i(clk_i),
+
 		.pc_o(pc_o),
 
-		//used to receive the instruction
+		.execute_fetch_jump_value_i(execute_fetch_jump_value_w),
+		.execute_fetch_flags_i(processor_flags_w),
+
 		.instruction_i(instruction_i),
 
-
-		.fetch_instruction_o(fetch_instruction_s)
+		.fetch_instruction_o(fetch_read_instruction_w)
 	);
 
 
 	stage_read read(
 
-		.src_1_o(processor_src_1_s),
-		.operand_1_i(processor_operand_1_s),
+		.execute_fetch_flags_i(processor_flags_w),
+		.flag_forward_i(flag_forward_w),
+		.data_forward_i(data_forward_w),
+
+		.regs_stop_i(regs_stop_w),
+		.regs_start_o(regs_start_w),
+
+		.clk_i(clk_i),
+		.rst_i(rst_i),
+
+		.src_1_o(regs_src_1_w),
+		.operand_1_i(regs_operand_1_w),
 
 
-		.src_2_o(processor_src_2_s),
-		.operand_2_i(processor_operand_2_s),
+		.src_2_o(regs_src_2_w),
+		.operand_2_i(regs_operand_2_w),
 
-		.read_instruction_i(read_instruction_s),
+		.read_instruction_i(fetch_read_instruction_w),
 
-		.data_1_o(data_1_s),
-		.data_2_o(data_2_s),
-		.opcode_o(opcode_s)
+		.dest_o(read_dest_w),
+		.data_1_o(read_data_1_w),
+		.data_2_o(read_data_2_w),
+		.opcode_o(read_opcode_w)
 	);
 
-	//description of the REGS block
+	//decoder for the opcode. If the operation is floting-point-based, it outputs 1, else it outputs 0
+	always_comb begin
+
+		opcode_diferent_w = 0;
+		if ( ( read_execute_opcode_w == `ADDF) || ( read_execute_opcode_w == `SUBF ) ) begin
+			opcode_diferent_w = 1;
+		end
+		else begin
+			opcode_diferent_w = 0;
+		end
+	end
+
 
 	regs REGS(
+		.clk_i(clk_i),
+		.rst_i(rst_i),
 
+		.regs_stop_o(regs_stop_w),
+		.regs_start_i(regs_start_w),
+
+		.src_1_i(regs_src_1_w),
+		.operand_1_o(regs_operand_1_w),
+
+		.src_2_i(regs_src_2_w),
+		.operand_2_o(regs_operand_2_w),
+
+		.wen_i(write_back_regs_wen_w),
+		.dest_i(write_back_regs_dest_w),
+		.result_i(write_back_regs_result_w)
 
 	);
 
+	//combinational block that directs the output of the READ stage to the proper execution branch (either EXECUTE or F_EXECUTE)
+	//TODO: when implementing data-control and JUMP behavior, add additional conditions based on the proper flags
+	always_comb begin
 
-	//description of intermediary Read-Execute Pipeline Register
+		read_execute_dest_w = 0;
+		read_execute_data_1_w = 0;
+		read_execute_data_2_w = 0;
+		read_execute_opcode_w = 0;
+
+		read_execute_f_dest_w = 0;
+		read_execute_f_data_1_w = 0;
+		read_execute_f_data_2_w = 0;
+		read_execute_f_opcode_w = 0;
+
+		if (opcode_diferent_w) begin
+
+			read_execute_f_dest_w = read_dest_w;
+			read_execute_f_data_1_w = read_data_1_w;
+			read_execute_f_data_2_w = read_data_2_w;
+			read_execute_f_opcode_w = read_opcode_w;
+
+		end
+		else begin
+
+			read_execute_dest_w = read_dest_w;
+			read_execute_data_1_w = read_data_1_w;
+			read_execute_data_2_w = read_data_2_w;
+			read_execute_opcode_w = read_opcode_w;
+
+		end
+	end
+
 
 	stage_execute execute(
 
+		.rst_i(rst_i),
+		.clk_i(clk_i),
+
+		.data_1_i(read_execute_data_1_w),
+		.data_2_i(read_execute_data_2_w),
+		.opcode_i(read_execute_opcode_w),
+		.dest_i(read_execute_dest_w),
+
+		.dest_o(execute_write_back_dest_w),
+		.write_back_result_o(execute_write_back_result_w),
+		.flags_o(processor_flags_w),
+
+		.execute_fetch_jump_value_o(execute_fetch_jump_value_w),
 
 		.address_o(address_o),
-		.data_out_o(data_out_o)
+		.data_out_o(data_out_o),
+		.write_o(write_o),
+		.read_o(read_o)
 
 	);
 
-	//description of intermediary Execute-Write_Back Pipeline Register
 
-	stage_write_back write_back(
 
-		.write_o(),
-		.dest_o(procesor_dest_s),
+	stage_execute_f execute_f(
+
+		.clk_i(clk_i),
+		.rst_i(rst_i),
+
+		.data_1_i(read_execute_f_data_1_w),
+		.data_2_i(read_execute_f_data_2_w),
+		.opcode_i(read_execute_f_opcode_w),
+		.dest_i(read_execute_f_dest_w),
+
+		.dest_o(execute_f_write_back_dest_w),
+		.write_back_result_o(execute_f_write_back_result_w)
+
+	);
+
+	//multiplexer that guides to WRITE_BACK stage the data from either execute or f_execute
+	//TODO: add additional conditions in order to account for the cases of useful results (FLOP doc, page 2, point 3)
+	always_comb begin
+		write_back_result_w = 0;
+		write_back_dest_w = 0;
+
+		if ( opcode_diferent_w )
+		begin
+
+			write_back_result_w = execute_write_back_result_w;
+			write_back_dest_w = execute_write_back_dest_w;
+
+		end
+		else begin
+
+			write_back_result_w = execute_f_write_back_result_w;
+			write_back_dest_w = execute_f_write_back_dest_w;
+
+		end
+	end
+
+
+	stage_wrtie_back write_back(
+
 		.data_in_i(data_in_i),
-		.result_o(processor_result_s)
+
+		.execute_result_i(write_back_result_w),
+		.execute_dest_i(write_back_dest_w),
+		.flags_i(processor_flags_w),
+
+
+		.write_reg_o(write_back_regs_wen_w),
+		.dest_o(write_back_regs_dest_w),
+		.result_o(write_back_regs_result_w)
 
 	);
 
+
+
+	//block that does the data forwarding logic
+	always_comb begin
+
+		flag_forward_w = 0;
+		data_forward_w = 0;
+
+		//solving dependency between data_in and instruction in READ stage
+		if( (read_execute_opcode_w==`LOAD) && ( execute_write_back_dest_w == regs_src_1_w ) && (execute_write_back_dest_w !=0 ) ) begin
+			flag_forward_w = 1;
+			data_forward_w = data_in_i;
+		end
+		else if( (read_execute_opcode_w==`LOAD) && ( execute_write_back_dest_w == regs_src_2_w ) && (execute_write_back_dest_w !=0 ) ) begin
+			flag_forward_w = 2;
+			data_forward_w = data_in_i;
+		end
+
+
+		//solving dependency between output of execute_f pipeline register and instruction in READ stage
+		if( ( execute_f_write_back_dest_w == regs_src_1_w ) && ( execute_f_write_back_dest_w != 0 ) ) begin
+			flag_forward_w = 1;
+			data_forward_w = execute_f_write_back_result_w;
+		end
+		else if( ( execute_f_write_back_dest_w == regs_src_2_w ) && ( execute_f_write_back_dest_w != 0 ) ) begin
+			flag_forward_w = 2;
+			data_forward_w = execute_f_write_back_result_w;
+		end
+
+		//solving dependency between output of execute pipeline register and instruction in READ stage
+		if( ( execute_write_back_dest_w == regs_src_1_w ) && (execute_write_back_dest_w !=0 ) ) begin
+			flag_forward_w = 1;
+			data_forward_w = execute_write_back_result_w;
+		end
+		else if( ( execute_write_back_dest_w == regs_src_2_w ) && (execute_write_back_dest_w !=0 ) ) begin
+			flag_forward_w = 2;
+			data_forward_w = execute_write_back_result_w;
+		end
+
+
+		//solving dependency between output of ALU in execute_f and instruction in READ stage
+		if( ( execute_f.dest_s4 == regs_src_1_w ) && ( execute_f.dest_s4 != 0 ) ) begin
+			flag_forward_w = 1;
+			data_forward_w = execute_f.write_back_result_s4;
+		end
+		else if( ( execute_f.dest_s4  == regs_src_2_w ) && ( execute_f.dest_s4 != 0 ) ) begin
+			flag_forward_w = 2;
+			data_forward_w = execute_f.write_back_result_s4;
+		end
+
+
+		//solving dependency between output of ALU in execute and instruction in READ stage
+		if( ( execute.dest_s == regs_src_1_w ) && (execute.dest_s !=0 ) ) begin
+			flag_forward_w = 1;
+			data_forward_w = execute.write_back_result_s;
+		end
+		else if( ( execute.dest_s == regs_src_2_w ) && (execute.dest_s !=0 ) ) begin
+			flag_forward_w = 2;
+			data_forward_w = execute.write_back_result_s;
+		end
+
+	end
+
+	//block that does the instruction stalling procedure -> will generate a flag
+	always_comb begin
+
+		stall_s = 0;
+
+		//solving dependency between data_in and instruction in READ stage
+		if( (read_execute_opcode_w==`LOAD) && ( execute_write_back_dest_w == regs_src_1_w ) && (execute_write_back_dest_w !=0 ) ) begin
+			stall_s = 1;
+		end
+		else if( (read_execute_opcode_w==`LOAD) && ( execute_write_back_dest_w == regs_src_2_w ) && (execute_write_back_dest_w !=0 ) ) begin
+			stall_s = 1;
+		end
+
+
+		//solving dependency between output of execute_f pipeline register and instruction in READ stage
+		if( ( execute_f_write_back_dest_w == regs_src_1_w ) && ( execute_f_write_back_dest_w != 0 ) ) begin
+			stall_s = 1;
+		end
+		else if( ( execute_f_write_back_dest_w == regs_src_2_w ) && ( execute_f_write_back_dest_w != 0 ) ) begin
+			stall_s = 1;
+		end
+
+		//solving dependency between output of execute pipeline register and instruction in READ stage
+		if( ( execute_write_back_dest_w == regs_src_1_w ) && (execute_write_back_dest_w !=0 ) ) begin
+			stall_s = 1;
+		end
+		else if( ( execute_write_back_dest_w == regs_src_2_w ) && (execute_write_back_dest_w !=0 ) ) begin
+			stall_s = 1;
+		end
+
+
+		//solving dependency between output of ALU in execute_f and instruction in READ stage
+		if( ( execute_f.dest_s4 == regs_src_1_w ) && ( execute_f.dest_s4 != 0 ) ) begin
+			stall_s = 1;
+		end
+		else if( ( execute_f.dest_s4  == regs_src_2_w ) && ( execute_f.dest_s4 != 0 ) ) begin
+			stall_s = 1;
+		end
+
+
+		//solving dependency between output of ALU in execute and instruction in READ stage
+		if( ( execute.dest_s == regs_src_1_w ) && (execute.dest_s !=0 ) ) begin
+			stall_s = 1;
+		end
+		else if( ( execute.dest_s == regs_src_2_w ) && (execute.dest_s !=0 ) ) begin
+			stall_s = 1;
+		end
+
+
+	end
 
 endmodule
+
+
 
 
