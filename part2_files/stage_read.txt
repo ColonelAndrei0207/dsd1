@@ -70,33 +70,35 @@ module stage_read(
 			begin
 
 				src_1_o = read_instruction_i[`F_SH_OP0];
+				dest_s = read_instruction_i[`F_SH_OP0];
 				regs_start_o = 1;
 
 			end
 
-			`LOAD:
+			`LOAD: //for load we want to get the 2 registers from the REGS set
 			begin
 
-				dest_s = read_instruction_i[`F_LS_OP0];
+				src_1_o = read_instruction_i[`F_LS_OP0];
 				src_2_o = read_instruction_i[`F_LS_OP1];
 				regs_start_o = 1;
 
 
 			end
 
-			`STORE:
+			`STORE: //for store we want to get the 2 registers from the REGS set
 			begin
 
-				src_1_o = read_instruction_i[`F_LS_OP1]; //R[op1] is the register that is being sent to the memory
-				src_2_o = read_instruction_i[`F_LS_OP0]; //R[op0] has it's address taken (it is nedeed fully)
+				src_1_o = read_instruction_i[`F_LS_OP0]; //R[op1] is the register that is being sent to the memory
+				src_2_o = read_instruction_i[`F_LS_OP1]; //R[op0] has it's address taken (it is nedeed fully)
 				regs_start_o = 1;
 
 			end
 
-			`LOADC:
+			`LOADC: //for LOADC we want to take a register from the REGS set, and load it's LS 8 bits with the constant found in the instruction body
 			begin
 
 				src_1_o = read_instruction_i[`F_LS_OP0];
+				dest_s = read_instruction_i[`F_LS_OP0];
 				regs_start_o = 1;
 
 			end
@@ -196,13 +198,22 @@ module stage_read(
 
 				`LOAD:
 				begin
-					if (flag_forward_i == 2) begin
 
+					if( flag_forward_i == 1 ) begin
+
+						data_1_s = data_forward_i;
+						data_2_s = operand_2_i;
+
+					end
+					else if (  flag_forward_i == 2 ) begin
+
+						data_1_s = operand_1_i;
 						data_2_s = data_forward_i;
 
 					end
 					else begin
 
+						data_1_s = operand_1_i;
 						data_2_s = operand_2_i;
 
 					end

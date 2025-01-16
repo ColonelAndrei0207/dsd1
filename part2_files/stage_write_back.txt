@@ -21,7 +21,7 @@ module stage_wrtie_back(
 	);
 	
 	//assigning the outputs that do not require complex logic
-	assign write_reg_o = (flags_i == `WRITE) ? 1 : 0;
+	assign write_reg_o = ( (flags_i == `WRITE) || (flags_i == `READ)  ) ? 1 : 0;
 	assign dest_o = (flags_i == `WRITE) ? execute_dest_i : 0;
 	
 	//a multiplexer that will direct the result_o either from the memory or the EXECUTE stage
@@ -29,7 +29,7 @@ module stage_wrtie_back(
 		
 		result_o = 0;
 
-		if(flags_i == `WRITE) begin
+		if( flags_i == `WRITE ) begin
 
 			result_o = execute_result_i;
 

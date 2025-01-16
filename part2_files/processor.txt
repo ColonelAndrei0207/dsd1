@@ -1,13 +1,15 @@
+ `timescale 1ns/10ps
+ 
  /* main processor architecture file
   * it includes the 4 level pipeline structure: FETCH, READ, EXECUTE, WRITE BACK
   * proper design file
   *
   *
   */
- `include "/home/digdevel/training/nodm/default/units/etti_colonel/source/rtl/defines.svh"
+ `include "/home/digdevel/training/nodm/default/units/spi_training/source/sv/rtl/procesor_etti/defines.svh"
 
 
-module processor(
+module procesor(
 
 		// general
 		input   logic      rst_i,   // active 0
@@ -99,22 +101,6 @@ module processor(
 
 
 
-	stage_fetch fetch(
-		// used for the ProgramCounter
-		.rst_i(rst_i),   // active 0
-		.clk_i(clk_i),
-
-		.pc_o(pc_o),
-
-		.execute_fetch_jump_value_i(execute_fetch_jump_value_w),
-		.execute_fetch_flags_i(processor_flags_w),
-
-		.instruction_i(instruction_i),
-
-		.fetch_instruction_o(fetch_read_instruction_w)
-	);
-
-
 	stage_read read(
 
 		.execute_fetch_flags_i(processor_flags_w),
@@ -142,11 +128,28 @@ module processor(
 		.opcode_o(read_opcode_w)
 	);
 
+
+	stage_fetch fetch(
+		// used for the ProgramCounter
+		.rst_i(rst_i),   // active 0
+		.clk_i(clk_i),
+
+		.pc_o(pc_o),
+
+		.execute_fetch_jump_value_i(execute_fetch_jump_value_w),
+		.execute_fetch_flags_i(processor_flags_w),
+
+		.instruction_i(instruction_i),
+
+		.fetch_instruction_o(fetch_read_instruction_w)
+	);
+
+
 	//decoder for the opcode. If the operation is floting-point-based, it outputs 1, else it outputs 0
 	always_comb begin
 
 		opcode_diferent_w = 0;
-		if ( ( read_execute_opcode_w == `ADDF) || ( read_execute_opcode_w == `SUBF ) ) begin
+		if ( ( read_opcode_w == `ADDF) || ( read_opcode_w == `SUBF ) ) begin
 			opcode_diferent_w = 1;
 		end
 		else begin
@@ -236,7 +239,8 @@ module processor(
 
 		.clk_i(clk_i),
 		.rst_i(rst_i),
-
+		
+		.flags_i(processor_flags_w),
 		.data_1_i(read_execute_f_data_1_w),
 		.data_2_i(read_execute_f_data_2_w),
 		.opcode_i(read_execute_f_opcode_w),
@@ -246,6 +250,8 @@ module processor(
 		.write_back_result_o(execute_f_write_back_result_w)
 
 	);
+	
+	
 
 	//multiplexer that guides to WRITE_BACK stage the data from either execute or f_execute
 	//TODO: add additional conditions in order to account for the cases of useful results (FLOP doc, page 2, point 3)
@@ -253,7 +259,7 @@ module processor(
 		write_back_result_w = 0;
 		write_back_dest_w = 0;
 
-		if ( opcode_diferent_w )
+		if ( !opcode_diferent_w )
 		begin
 
 			write_back_result_w = execute_write_back_result_w;
@@ -284,7 +290,7 @@ module processor(
 
 	);
 
-
+/*
 
 	//block that does the data forwarding logic
 	always_comb begin
@@ -347,6 +353,9 @@ module processor(
 
 	end
 
+
+
+
 	//block that does the instruction stalling procedure -> will generate a flag
 	always_comb begin
 
@@ -397,6 +406,8 @@ module processor(
 
 
 	end
+	
+	*/
 
 endmodule
 

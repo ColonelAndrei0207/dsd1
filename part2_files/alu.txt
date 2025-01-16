@@ -5,6 +5,7 @@
 
 //TODO: eventually use "alias" or assign operations for operand2_i when doing JMP operations (in order to ease the reading and debugging of code)
 
+
 module alu(
 		//inputs from the READ stage
 		input logic [`D_BITS-1:0] operand1_i,
@@ -146,6 +147,7 @@ module alu(
 			`STORE:
 			begin
 
+				result_o = operand1_i;
 				addr_o = operand2_i[ `A_BITS-1:0];
 				flags_alu_o = `WRITE_MEM;
 
@@ -271,7 +273,7 @@ module alu(
 			`SHIFTL:
 			begin
 
-				result_o = operand1_i << operand2_i[5:0];
+				result_o = operand1_i <<< operand2_i[5:0];
 				flags_alu_o = `WRITE;
 			end
 

@@ -11,12 +11,13 @@
  `define FLAGS_NR 3
  `define CST_NR_BITS 8
  `define SIGN_BITS 1
+ `define E_BITS 8 
  
- `define M_BITS 23
- `define E_BITS 8
+ `define M_BITS `D_BITS-`SIGN_BITS-`E_BITS
+
  
- `define F_E_FLOP	`D_BITS-`SIGN_BITS-1:`D_BITS-`E_BITS-1 
- `define F_M_FLOP	`M_BITS-1:0
+ `define F_E_FLOP	`D_BITS-`SIGN_BITS-1:`D_BITS-`E_BITS-1  // we have the 30:23 field for the exponent
+ `define F_M_FLOP	`M_BITS-1:0 // we have 22:0 the field for the mantissa
  
 
 //2. REGISTER SET
