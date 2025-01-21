@@ -3,13 +3,15 @@
 
 /*
  program memory file
+ Mimics the proper program memory that will be implemented sooner
+ Present function is to ensure acurate instruction flow, using the PC inside the FETCH stage
+ Will contain programs written to test the processor's functionalities
 
  */
 
 
 module program_mem (
 
-		input logic clk_i,
 
 		input logic [`A_BITS-1:0] instr_addr_i,
 		output logic [15:0] instr_o
@@ -32,108 +34,209 @@ module program_mem (
 
 /*
 	always_comb begin
+		//testing of data dependency
 
-		gen_instr[0] = {`LOADC_I, `R1, 8'd15};
-		gen_instr[1] = {`LOADC_I, `R4, 8'd8};
-		gen_instr[2] = {`LOADC_I, `R0, 8'd5};
-		gen_instr[3] = {`LOADC_I, `R6, 8'd30};
-		gen_instr[4] = {`LOADC_I, `R7, 8'd2};
-		gen_instr[5] = {`LOADC_I, `R5, 8'd123};
-		gen_instr[6] = {`ADD, `R3, `R0, `R1};
-		gen_instr[7] = {`LOADC_I, `R4, 8'd15};
-		gen_instr[8] = {`ADD, `R6, `R2, `R1};
-		gen_instr[9] = {`JMP_I, 9'b0, `R4};
-		gen_instr[10] = {`NOP, 9'bx};
-		gen_instr[11] = { `JMPRC_I, `N, `R0, 6'd1  };
-		gen_instr[12] = { `NOP, 9'bx};
-		gen_instr[13] = {`SHIFTL, `R3, 6'd2 };
-		gen_instr[14] = { `SHIFTRA, `R5, 6'd2 };
-		gen_instr[15] = {`JMPC_I, `Z, `R7, 3'd0, `R0 };
-		gen_instr[16] = {`HALT, 9'bx };
-		gen_instr[17] = {`HALT, 9'bx};
-		gen_instr[18] = {`LOAD_I, `R5, 5'd0, `R6};
-		gen_instr[19] = {`HALT, 9'bx};
+		gen_instr[0] = {`LOADC_I, `R1, 8'd18};
+		gen_instr[1] = {`LOADC_I, `R2, 8'd10};
+		gen_instr[2] = {`LOADC_I, `R3, 8'd5};
+		gen_instr[3] = {`LOADC_I, `R4, 8'd13};
+		gen_instr[4] = {`LOADC_I, `R5, 8'd1};
+		gen_instr[5] = {`ADD, `R6, `R1, `R2};
+		gen_instr[6] = {`ADD, `R7, `R6, `R1}; //dependency between end of EX and READ
+		gen_instr[7] = {`SUB, `R2, `R7, `R2}; //dependency between start WRITE_BACK and READ 
+		gen_instr[8] = {`AND, `R0, `R6, `R7};
+		gen_instr[9] = {`LOAD_I, `R2, 5'b0, `R3};
+		gen_instr[10] = {`NOP, 9'bx}; 
+		gen_instr[11] = {`NOP, 9'bx};
+		gen_instr[12] = {`NOP, 9'bx};
+		gen_instr[13] = {`NOP, 9'bx};
 
-	end
-*/
-
-	always_comb begin
-
-		gen_instr[0] = {`LOADC_I, `R5, 8'd15};
-		gen_instr[1] = {`LOADC_I, `R2, 8'd8};
-		gen_instr[2] = {`NOP, 9'bx};
-		gen_instr[3] = {`NOP, 9'bx};
-		gen_instr[4] = {`ADD, `R3, `R5, `R2};
-		gen_instr[5] = {`SUB, `R4, `R5, `R2};
-		gen_instr[6] = {`NOP, 9'bx}; //put in r6 value from data_in
-		gen_instr[7] = {`NOP, 9'bx};
-		gen_instr[8] = {`NOP, 9'bx};
-		gen_instr[9] = {`NOP, 9'bx};
-		gen_instr[10] = { `LOADC_I, `R0, 8'b11111111}; //then i want them to shift left 22 times
-		gen_instr[11] = { `LOADC_I, `R1, 8'b11111111}; //then i want them to shift left 22 times
- 		gen_instr[12] = { `NOP, 9'bx};
-		gen_instr[13] = { `NOP, 9'bx};
-		gen_instr[14] = { `SHIFTL, `R0, 6'd22}; //16-6 = 10
-		gen_instr[15] = { `SHIFTL, `R1, 6'd22};
-		gen_instr[16] = { `NOP, 9'bx};
-		gen_instr[17] = { `NOP, 9'bx};
-		gen_instr[18] = {`ADDF, `R3, `R1, `R0 }; //i should see on r3 the value of 3.0 in FP.
-		gen_instr[19] = {`SUBF, `R4, `R0, `R1 }; //i should see on r4 the value of 0 in FP
-		gen_instr[20] = { `NOP, 9'bx};
-		gen_instr[21] = {`STORE_I,`R2, 5'd0, `R3 };
-		gen_instr[22] = {`STORE_I,`R6, 5'd0, `R4 };		
-		gen_instr[23] = { `NOP, 9'bx};
-		gen_instr[24] = { `NOP, 9'bx};
-		gen_instr[25] = { `NOP, 9'bx};
-		gen_instr[26] = { `NOP, 9'bx};
-		gen_instr[27] = { `NOP, 9'bx};
-		gen_instr[28] = { `NOP, 9'bx};
-		gen_instr[29] = { `NOP, 9'bx};
-		gen_instr[30] = { `NOP, 9'bx};
-		gen_instr[31] = {`HALT, 9'bx };
+		gen_instr[14] = {`HALT, 9'bx};
 
 	end
 
+	*/
 
-/*
-	always_comb begin
+	/*
+	 always_comb begin
+	 //testing of all jump instructions
 
-		gen_instr[0] = {`LOADC_I, `R0, 8'd10}; //ct 1
-		gen_instr[1] = {`LOADC_I, `R1, 8'd5}; //ct 2
-		gen_instr[2] = {`LOADC_I, `R1, 8'd9}; //position of loop start
-		gen_instr[3] = {`LOADC_I, `R6, 8'd16}; //position of loop cond
-		gen_instr[4] = {`LOADC_I, `R7, 8'd1}; // value of 1 used for increment
-		gen_instr[5] = {`LOADC_I, `R2, 8'd0}; //loop counter
-		gen_instr[6] = {`LOADC_I, `R3, 8'd50}; //loop limit
-		
-		//data dependency
-		gen_instr[7] = {`ADD, `R4, `R0, `R1};
-		gen_instr[8] = {`SUB, `R5, `R4, `R1};
-		
-		
-		//while loop start -> pos 9
-		gen_instr[9] = {`ADD, `R2, `R2, `R7}; //increment loop counter
-		gen_instr[10] = {`SUB, `R6, `R3, `R2}; //condition to exit loop
-
-//condition for loop start
-		gen_instr[11] = {`JMPC_I, `NZ, `R6, 3'b0, `R3}; //check R6 is not zero, if 0 then go to loop cond
-
-//body of loop
-		gen_instr[12] = {`SHIFTL, `R0, 6'b1};
-		gen_instr[13] = { `SHIFTRA, `R1, 6'b1 };
-		gen_instr[14] = { `AND, `R4, `R4, `R3  };
-		gen_instr[15] = { `JMP_I, 9'b0, `R1 }; //jump to loop start, aka value 
-
-
-//loop cond ->16
-		
-		gen_instr[50] = {`LOAD_I, `R7, 5'b0, `R4};
-		gen_instr[51] = {`STORE_I, `R7, 5'b0, `R5};
-		gen_instr[52] = {`HALT, 9'bx};
-
-	end
-*/
+	 gen_instr[0] = {`LOADC_I, `R1, 8'd18};
+	 gen_instr[1] = {`LOADC_I, `R2, 8'd10};
+	 gen_instr[2] = {`LOADC_I, `R3, 8'd5};
+	 gen_instr[3] = {`LOADC_I, `R4, 8'd13};
+	 gen_instr[4] = {`LOADC_I, `R5, 8'd1};
+	 gen_instr[5] = {`JMP_I, 9'bx, `R2};
+	 gen_instr[6] = {`ADD, `R7, `R1, `R2};
+	 gen_instr[7] = {`STORE_I,`R2, 5'd0, `R3};
+	 gen_instr[8] = {`NOP, 9'bx}; //put in r6 value from data_in
+	 gen_instr[9] = {`JMPR_I, 6'bx, 6'd1}; //this instruction is skipped (succesful jump)
+	 gen_instr[10] = {`STORE_I,`R2, 5'd0, `R3}; //store register R3 in data mem @ R2 address
+	 gen_instr[11] = {`NOP, 9'bx};
+	 gen_instr[12] = { `NOP, 9'bx}; //then i want them to shift left 22 times
+	 gen_instr[13] = { `JMPR_I, 6'bx, 6'd9}; // if R3 == 0, PC = R1
+	 gen_instr[14] = { `SUB, `R3, `R3, `R5 };
+	 gen_instr[15] = { `STORE_I,`R2, 5'd0, `R4}; //R0 will have 1.5
+	 gen_instr[16] = { `NOP, 9'bx}; //R1 will have 1.5
+	 gen_instr[17] = {`JMP_I, 9'bx, `R4};
+	 gen_instr[18] = {`JMPRC_I, `Z, `R3, 6'd2};
+	 gen_instr[19] = {`LOADC_I, `R5, 8'd1};
+	 gen_instr[20] = {`JMP_I, 9'bx, `R2};
+	 gen_instr[21] = {`NOP, 9'bx};
+	 gen_instr[22] = {`NOP, 9'bx};
+	 gen_instr[23] = {`NOP, 9'bx};
+	 gen_instr[24] = {`STORE_I, `R2, 5'd0, `R3};
+	 gen_instr[25] = { `NOP, 9'bx}; //R1 will have 1.5
+	 gen_instr[26] = {`HALT, 9'bx};
 
 
-endmodule   
+	 end
+
+	*/
+	/*
+
+	 always_comb begin
+	 //testing of the LOAD(C) and STORE instructions
+
+	 gen_instr[0] = {`LOADC_I, `R1, 8'd15};
+	 gen_instr[1] = {`LOADC_I, `R2, 8'd8};
+	 gen_instr[2] = {`NOP, 9'bx};
+	 gen_instr[3] = {`NOP, 9'bx};
+	 gen_instr[4] = {`ADD, `R3, `R1, `R2};
+	 gen_instr[5] = {`SUB, `R4, `R1, `R2};
+	 gen_instr[6] = {`NOP, 9'bx}; //put in r6 value from data_in
+	 gen_instr[7] = {`NOP, 9'bx};
+	 gen_instr[8] = {`STORE_I,`R2, 5'd0, `R3}; //store register R3 in data mem @ R2 address
+	 gen_instr[9] = {`STORE_I,`R1, 5'd0, `R4};
+	 gen_instr[10] = { `NOP, 9'bx}; //then i want them to shift left 22 times
+	 gen_instr[11] = { `NOP, 9'bx}; //then i want them to shift left 22 times
+	 gen_instr[12] = { `LOAD_I, `R5, 5'b0, `R3}; //load reg r5 with r3 address
+	 gen_instr[13] = {`NOP, 9'bx};
+	 gen_instr[14] = { `NOP, 9'bx}; //R0 will have 1.5
+	 gen_instr[15] = { `NOP, 9'bx}; //R1 will have 1.5
+	 gen_instr[16] = {`HALT, 9'bx };
+	 gen_instr[17] = 0;
+	 gen_instr[18] = 0;
+	 gen_instr[19] = 0;
+	 gen_instr[20] = 0;
+
+
+	 end
+
+	*/
+	/*
+
+	 always_comb begin
+
+	 gen_instr[0] = {`LOADC_I, `R1, 8'd15};
+	 gen_instr[1] = {`LOADC_I, `R4, 8'd8};
+	 gen_instr[2] = {`LOADC_I, `R0, 8'd5};
+	 gen_instr[3] = {`LOADC_I, `R6, 8'd30};
+	 gen_instr[4] = {`LOADC_I, `R7, 8'd2};
+	 gen_instr[5] = {`LOADC_I, `R5, 8'd123};
+	 gen_instr[6] = {`ADD, `R3, `R0, `R1};
+	 gen_instr[7] = {`LOADC_I, `R4, 8'd15};
+	 gen_instr[8] = {`ADD, `R6, `R2, `R1};
+	 gen_instr[9] = {`JMP_I, 9'b0, `R4};
+	 gen_instr[10] = {`NOP, 9'bx};
+	 gen_instr[11] = { `JMPRC_I, `N, `R0, 6'd1  };
+	 gen_instr[12] = { `NOP, 9'bx};
+	 gen_instr[13] = {`SHIFTL, `R3, 6'd2 };
+	 gen_instr[14] = { `SHIFTRA, `R5, 6'd2 };
+	 gen_instr[15] = {`JMPC_I, `Z, `R7, 3'd0, `R0 };
+	 gen_instr[16] = {`HALT, 9'bx };
+	 gen_instr[17] = {`HALT, 9'bx};
+	 gen_instr[18] = {`LOAD_I, `R5, 5'd0, `R6};
+	 gen_instr[19] = {`HALT, 9'bx};
+
+	 end
+
+		*/
+	
+	 always_comb begin
+
+	 //testing of the EX_F block
+	 gen_instr[0] = {`LOADC_I, `R5, 8'd15};
+	 gen_instr[1] = {`LOADC_I, `R2, 8'd8};
+	 gen_instr[2] = {`NOP, 9'bx};
+	 gen_instr[3] = {`NOP, 9'bx};
+	 gen_instr[4] = {`ADD, `R3, `R5, `R2};
+	 gen_instr[5] = {`SUB, `R4, `R5, `R2};
+	 gen_instr[6] = {`NOP, 9'bx}; //put in r6 value from data_in
+	 gen_instr[7] = {`NOP, 9'bx};
+	 gen_instr[8] = {`NOP, 9'bx};
+	 gen_instr[9] = {`NOP, 9'bx};
+	 gen_instr[10] = { `LOADC_I, `R0, 8'b11111111}; //then i want them to shift left 22 times
+	 gen_instr[11] = { `LOADC_I, `R1, 8'b11111111}; //then i want them to shift left 22 times
+	 gen_instr[12] = { `NOP, 9'bx};
+	 gen_instr[13] = { `NOP, 9'bx};
+	 gen_instr[14] = { `SHIFTL, `R0, 6'd22}; //R0 will have 1.5
+	 gen_instr[15] = { `SHIFTL, `R1, 6'd22}; //R1 will have 1.5
+	 gen_instr[16] = { `NOP, 9'bx};
+	 gen_instr[17] = { `NOP, 9'bx};
+	 gen_instr[18] = {`ADDF, `R3, `R1, `R0 }; //i should see on r3 the value of 3.0 in FP.
+	 gen_instr[19] = {`SUBF, `R4, `R0, `R1 }; //i should see on r4 the value of 0 in FP
+	 gen_instr[20] = { `NOP, 9'bx};
+	 gen_instr[21] = {`STORE_I,`R2, 5'd0, `R3 }; //STORE 3.0 in FP
+	 gen_instr[22] = {`STORE_I,`R6, 5'd0, `R4 }; //STORE 0 in FP
+	 gen_instr[23] = { `NOP, 9'bx};
+	 gen_instr[24] = { `NOP, 9'bx};
+	 gen_instr[25] = { `NOP, 9'bx};
+	 gen_instr[26] = { `NOP, 9'bx};
+	 gen_instr[27] = { `NOP, 9'bx};
+	 gen_instr[28] = { `NOP, 9'bx};
+	 gen_instr[29] = { `NOP, 9'bx};
+	 gen_instr[30] = { `NOP, 9'bx};
+	 gen_instr[31] = {`HALT, 9'bx };
+	 gen_instr[32] = 0;
+	 gen_instr[33] = 0;
+	 gen_instr[34] = 0;
+	 gen_instr[35] = 0;
+
+
+	 end
+
+	
+	/*
+
+	 always_comb begin
+
+	 gen_instr[0] = {`LOADC_I, `R0, 8'd10}; //ct 1
+	 gen_instr[1] = {`LOADC_I, `R1, 8'd5}; //ct 2
+	 gen_instr[2] = {`LOADC_I, `R1, 8'd9}; //position of loop start
+	 gen_instr[3] = {`LOADC_I, `R6, 8'd16}; //position of loop cond
+	 gen_instr[4] = {`LOADC_I, `R7, 8'd1}; // value of 1 used for increment
+	 gen_instr[5] = {`LOADC_I, `R2, 8'd0}; //loop counter
+	 gen_instr[6] = {`LOADC_I, `R3, 8'd50}; //loop limit
+
+	 //data dependency
+	 gen_instr[7] = {`ADD, `R4, `R0, `R1};
+	 gen_instr[8] = {`SUB, `R5, `R4, `R1};
+
+
+	 //while loop start -> pos 9
+	 gen_instr[9] = {`ADD, `R2, `R2, `R7}; //increment loop counter
+	 gen_instr[10] = {`SUB, `R6, `R3, `R2}; //condition to exit loop
+
+	 //condition for loop start
+	 gen_instr[11] = {`JMPC_I, `NZ, `R6, 3'b0, `R3}; //check R6 is not zero, if 0 then go to loop cond
+
+	 //body of loop
+	 gen_instr[12] = {`SHIFTL, `R0, 6'b1};
+	 gen_instr[13] = { `SHIFTRA, `R1, 6'b1 };
+	 gen_instr[14] = { `AND, `R4, `R4, `R3  };
+	 gen_instr[15] = { `JMP_I, 9'b0, `R1 }; //jump to loop start, aka value
+
+
+	 //loop cond ->16
+
+	 gen_instr[50] = {`LOAD_I, `R7, 5'b0, `R4};
+	 gen_instr[51] = {`STORE_I, `R7, 5'b0, `R5};
+	 gen_instr[52] = {`HALT, 9'bx};
+
+	 end
+	 */
+
+
+endmodule
 

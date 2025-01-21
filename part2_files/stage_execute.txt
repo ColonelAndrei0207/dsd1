@@ -1,12 +1,19 @@
 /* execute stage file
- * it should contain the ALU (to be made) so that it can solve said instructions
- * ALU description is more or less a combination between the golden model and the ALU module description from 4th year ASC lab
+ *
+ * Description of the EXECUTE stage
+ *  It contains the ALU
+ * It follows the description in the requirments and performs combinationally the instruction
+ * Using combinational logic we output to the "data_memory" the required address, result and write/read flags, based on the results of the ALU
+ * At the end, it contains the description of the pipeline register between the EXECUTE and WRITE BACK stages
+ *
  */
 module stage_execute(
 
 		//inputs from system
 		input logic clk_i,
 		input logic rst_i,
+		
+		input logic stall_flag_i,
 
 		//inputs from the READ_EXECUTE pipeline register
 
@@ -24,11 +31,16 @@ module stage_execute(
 		//output to the FETCH stage (used when a JUMP instruction has been processed
 		output logic [`A_BITS-1:0] execute_fetch_jump_value_o,
 
+		//output directed for checking with the data_forwarding logic
+		output logic [2:0] dest_alu_o,
+
 		//outputs to the memory
 		output logic write_o,
 		output logic read_o,
 		output  logic [`A_BITS-1:0]    address_o,
 		output   logic  [`D_BITS-1:0]    data_out_o
+		
+
 
 	);
 
@@ -42,6 +54,8 @@ module stage_execute(
 	logic [2:0] aux_s;
 
 	logic [`D_BITS-1:0] write_back_result_s;
+
+	logic [`A_BITS-1:0] execute_fetch_jump_value_s;
 
 
 	alu ALU(
@@ -63,7 +77,7 @@ module stage_execute(
 	//intermediary variable used to transport from the ALU, the result of the operation to the Intermediary Pipeline Register between EXECUTE and WRITE_BACK stages
 	assign write_back_result_s = ((flags_s == `WRITE) || (flags_s == `READ) ) ? result_s : 0;
 
-	assign execute_fetch_jump_value_o = ((flags_s == `JUMP_SIMPLE) || (flags_s == `JUMP_ADD) ) ? result_s[`A_BITS-1:0] : 0;
+	assign execute_fetch_jump_value_s = ((flags_s == `JUMP_SIMPLE) || (flags_s == `JUMP_ADD) ) ? result_s[`A_BITS-1:0] : 0;
 
 	//connections to the data_memory
 
@@ -77,6 +91,10 @@ module stage_execute(
 	//a demultiplexer that will redirect the dest_i either to the ALU or the WRITE_BACK stage
 	always_comb begin
 
+		aux_s = 0;
+		dest_s = 0;
+		dest_alu_o = 0;
+
 		if(opcode_i == `JMPC) begin
 
 			aux_s = dest_i;
@@ -85,12 +103,42 @@ module stage_execute(
 		else begin
 
 			dest_s = dest_i;
+			dest_alu_o = dest_i;
 
 		end
 	end
 
 
 	//PIPELINE REGISTER between EXECUTE and WRITE BACK
+
+//register used to transport execute_fetch_jump_value_o
+
+	always_ff @ (posedge clk_i, negedge rst_i) begin
+
+		if(!rst_i) begin
+
+			execute_fetch_jump_value_o <= 0 ;
+		end
+		else begin
+
+			if ((flags_o == `STOP) || ( stall_flag_i )) begin
+
+				execute_fetch_jump_value_o <= execute_fetch_jump_value_o;
+
+			end
+			else begin
+
+				execute_fetch_jump_value_o <= execute_fetch_jump_value_s;
+
+			end
+
+		end
+
+
+
+	end
+
+
 
 //register used to transport dest_o
 	always_ff @ (posedge clk_i, negedge rst_i) begin
@@ -100,7 +148,7 @@ module stage_execute(
 
 		end
 		else begin
-			if (flags_s == `STOP) begin
+			if ((flags_o == `STOP) || ( stall_flag_i )) begin
 
 				dest_o <= dest_o;
 
@@ -121,7 +169,7 @@ module stage_execute(
 
 		end
 		else begin
-			if (flags_s == `STOP) begin
+			if ((flags_o == `STOP ) || ( stall_flag_i )) begin
 
 				write_back_result_o <= write_back_result_o;
 
@@ -142,16 +190,18 @@ module stage_execute(
 
 		end
 		else begin
-/*			if (flags_s == `STOP) begin
+
+			if (flags_o == `STOP ) begin
 
 				flags_o <= flags_o;
 
 			end
+
 			else begin
-*/
+
 				flags_o <= flags_s;
 
-//			end
+			end
 		end
 	end
 

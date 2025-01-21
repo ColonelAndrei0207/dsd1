@@ -1,5 +1,7 @@
 /* write_back stage file
  *
+ * Simple description, decides which data should be outputed to the REGS file (either from previous stage or from data_in_i
+ * No need for registers, fully combinational module
  *
  */
 module stage_wrtie_back(
@@ -22,7 +24,7 @@ module stage_wrtie_back(
 	
 	//assigning the outputs that do not require complex logic
 	assign write_reg_o = ( (flags_i == `WRITE) || (flags_i == `READ)  ) ? 1 : 0;
-	assign dest_o = (flags_i == `WRITE) ? execute_dest_i : 0;
+	assign dest_o = ( (flags_i == `WRITE) || (flags_i == `READ)  ) ? execute_dest_i : 0;
 	
 	//a multiplexer that will direct the result_o either from the memory or the EXECUTE stage
 	always_comb begin

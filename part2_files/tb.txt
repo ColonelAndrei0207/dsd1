@@ -1,5 +1,13 @@
 `timescale 1ns/10ps
 
+/*
+ * Describes how the test will turn out
+ * In essence we generate the clock, perform a reset, and wait for the program memory to run out of instructions
+ * 
+ * TODO: add clever solutions to reduce the simulation time (if's to stop faster if a 'HALT' is detected)
+ */
+
+
  `include "/home/digdevel/training/nodm/default/units/spi_training/source/sv/rtl/procesor_etti/defines.svh"
 
 
@@ -31,7 +39,6 @@ module processor_tb();
 
 	program_mem program_mem(
 
-		.clk_i(clk),
 		.instr_addr_i(pc),
 		.instr_o(instruction)
 

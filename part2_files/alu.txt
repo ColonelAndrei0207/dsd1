@@ -1,9 +1,17 @@
 /* ALU file
  * description of the ALU module that is placed inside the exectue stage
- * ALU description is more or less a combination between the golden model and the ALU module description from 4th year ASC lab
+ * ALU description takes the necesary info from the READ stage(inputs from the EXECUTE stage
+ * And performs the actual integer calcuations
+ * It is described in a combinational matter, inputs being synched with the clock using the pipeline register
+ * It will use a casex construct, in order to account for the different sizes of the opcode:
+ * 	7 bits for arithmetic and logic instructions
+ * 	5 bits for the LOAD(C) and STORE instructions
+ * 	4 bits for the JMP(R)(C) instructions
+ * It will also output the necessary flags that wil be used inside the entire processor
+ * TODO: as an improvement and to ensure more user friendlines, "break-up" the flags_alu_o output either into multiple outputs or one larger bus that has a "hot-one" configuration
+ * 
  */
 
-//TODO: eventually use "alias" or assign operations for operand2_i when doing JMP operations (in order to ease the reading and debugging of code)
 
 
 module alu(
@@ -29,6 +37,7 @@ module alu(
 		flags_alu_o = 0;
 		addr_o = 0;
 
+		
 		casex(opcode_i)
 
 			`JMP:
@@ -138,7 +147,7 @@ module alu(
 
 			`LOAD:
 			begin
-				result_o = operand1_i; //we will have the dest_o that is used by WRITE_BACK to send info to the REGS
+				//result_o = operand1_i; //we will have the dest_o that is used by WRITE_BACK to send info to the REGS
 				addr_o = operand2_i[ `A_BITS-1:0 ];
 				flags_alu_o = `READ;
 

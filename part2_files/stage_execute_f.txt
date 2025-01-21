@@ -8,20 +8,23 @@
  * Main 4 steps are:
  *  1. comparison
  *
- *
+ *      Compares the 2 data inputted
  *
  *  2. alignment
  *
- *
+ *  Ensures that the data are alligned in order to do the actual addition / substraction
  *
  *  3. addition
  *
+ *      Actual instruction calculation
  *
  *
  *  4. renormalization
  *
+ *      Ensures that the result outputted follows the IEEE 1800-2012 standard regarding floating point data
  *
  *
+ *  In the end, the pipeline register between the EXECUTE_F stage and WRITE_BACK stage is implemented
  *
  */
 module stage_execute_f(
@@ -29,6 +32,8 @@ module stage_execute_f(
 		//inputs from system
 		input logic clk_i,
 		input logic rst_i,
+
+		input logic stall_flag_i,
 
 		//input from the EXECUTION block (the flags) in order to clear or hold in case of jump or HALT
 		input logic [`FLAGS_NR-1:0] flags_i,
@@ -40,6 +45,9 @@ module stage_execute_f(
 		input logic [6:0] opcode_i,
 		input logic [2:0] dest_i,
 
+		//output from r4 to the data_forwarding block
+		output logic [2:0] dest_r4_o,
+
 		//output to the WRITE_BACK stage
 
 		output logic [2:0] dest_o,
@@ -48,14 +56,16 @@ module stage_execute_f(
 	);
 
 
-	logic [23:0] mant_tmp;
-	logic [23:0] mant_tmp_s4;
+
 	logic [7:0] exp_tmp;
 	logic [7:0] exp_tmp_s4;
 	// Extract mantissas with implicit leading bit
 	logic [23:0] mant_a;
 	logic [23:0] mant_b;
 	logic [24:0] mant_result;  // One extra bit for carry/borrow
+
+	logic [24:0] mant_tmp_s4;
+
 	logic sign_result;
 
 
@@ -170,7 +180,7 @@ module stage_execute_f(
 
 	end
 
-//r3    ->addition
+//r3    -> addition
 	always_ff @ (posedge clk_i, negedge rst_i) begin
 		if (!rst_i) begin
 			write_back_result_s3 <= 0;
@@ -207,363 +217,57 @@ module stage_execute_f(
 
 
 
+//r4    -> renormalization
+	always_ff @(posedge clk_i or negedge rst_i) begin
+		if (!rst_i) begin
+			write_back_result_s4 <= 0;
+			dest_s4 <= 0;
+			mant_tmp_s4 <= 0;
+			exp_tmp_s4 <= 0;
+		end else begin
+			dest_s4 <= dest_s3;
 
-	//TODO:modify line 228 so that no "while" loop is used 
-	
-/*
- *     // PIPELINE REGISTER between EXECUTE and WRITE BACK
+			mant_tmp_s4 <= mant_result; //we need to have the extra one for the calculation and the extra zero in case of the carry
+			exp_tmp_s4 <= write_back_result_s3[`F_E_FLOP];
 
-    // register used to transport dest_o
-    always_ff @(posedge clk_i or negedge rst_i) begin
-        if (!rst_i) begin
-            dest_o <= 0;
-        end else begin
-            if ((flags_i == `JUMP_ADD) || (flags_i == `JUMP_SIMPLE)) begin
-                dest_o <= 0;
-            end else begin
-                dest_o <= dest_s4;
-            end
-        end
-    end
+			if(mant_tmp_s4[24]) begin //handle overflow
 
-    // register used to transport write_back_result_o
-    always_ff @(posedge clk_i or negedge rst_i) begin
-        if (!rst_i) begin
-            write_back_result_o <= 0;
-        end else begin
-            if ((flags_i == `JUMP_ADD) || (flags_i == `JUMP_SIMPLE)) begin
-                write_back_result_o <= 0;
-            end else begin
-                write_back_result_o <= write_back_result_s4;
-            end
-        end
-    end
+				mant_tmp_s4 <= mant_tmp_s4 >>1;
+				exp_tmp_s4 <= exp_tmp_s4 +1;
 
-endmodule
+			end
 
-Explanation of the Synthesis-Friendly Normalization Logic
+			else begin
+				if (mant_tmp_s4[23] == 0 && exp_tmp_s4 != 0) begin
+					if (mant_tmp_s4[22]) begin
+						mant_tmp_s4 <= mant_tmp_s4 << 1;
+						exp_tmp_s4 <= exp_tmp_s4 - 1;
+					end
+					if (mant_tmp_s4[21]) begin
+						mant_tmp_s4 <= mant_tmp_s4 << 2;
+						exp_tmp_s4 <= exp_tmp_s4 - 2;
+					end
+					if (mant_tmp_s4[19]) begin
+						mant_tmp_s4 <= mant_tmp_s4 << 4;
+						exp_tmp_s4 <= exp_tmp_s4 - 4;
+					end
+					if (mant_tmp_s4[15]) begin
+						mant_tmp_s4 <= mant_tmp_s4 << 8;
+						exp_tmp_s4 <= exp_tmp_s4 - 8;
+					end
+					if (mant_tmp_s4[7]) begin
+						mant_tmp_s4 <= mant_tmp_s4 << 16;
+						exp_tmp_s4 <= exp_tmp_s4 - 16;
+					end
+				end
+			end
 
-Initialization:
-
-mant_tmp_s4 is initialized with the mantissa and the implicit leading bit.
-exp_tmp_s4 is initialized with the exponent of the result.
-Normalization Process:
-
-Left Shift (Normalization):
-
-Instead of using a while loop, we use a series of conditional checks and fixed shifts.
-Each condition checks specific bits of the mantissa to determine if a shift is required.
-For example, if mant_tmp_s4[22] is set, shift by 1 bit; if mant_tmp_s4[21] is set, shift by 2 bits, and so on.
-This ensures that the normalization can be synthesized properly.
-Right Shift (Handle Carry Bit):
-
-If mant_tmp_s4[24] (the 24th bit, indicating a carry from addition) is set, it indicates that the mantissa needs a right shift.
-The mantissa is shifted right by one bit, and the exponent is incremented by one.
-Final Result Assembly:
-
-The normalized mantissa and adjusted exponent are packed into write_back_result_s4.
-
-Conclusion
-
-By avoiding the use of while loops and employing fixed shifts based on specific bit checks, the updated normalization process ensures synthesis-friendly implementation while still correctly normalizing the mantissa. This approach adheres to synthesis guidelines and provides a robust solution for the renormalization step.
+			write_back_result_s4 <= { sign_result, exp_tmp_s4, mant_tmp_s4[22:0] };
+		end
+	end
 
 
-Questions to Clarify the Topic
-
-Do you need to handle special cases like NaN, infinity, or subnormal numbers in your implementation?
-What precision of floating-point numbers are you working with (e.g., single precision, double precision)?
-Do you require any specific rounding modes, or is basic truncation sufficient?
-Are there any constraints on the hardware resources available for this implementation?
-How would you like to handle overflow and underflow conditions in the final design?
-
-Feel free to ask for further details or any specific modifications to the provided explanation and code!
- * 
- * 
- * Certainly! To ensure the renormalization step adheres to synthesis guidelines, we'll avoid using constructs like while loops that are not always synthesis-friendly. Instead, we'll implement a fixed number of shifts based on the maximum potential shifts required. For a 24-bit mantissa in IEEE 754 single-precision format, the maximum number of shifts required to normalize the result is 24.
-
-
-Below is the updated renormalization step implemented with a fixed number of shifts:
-
-
-Updated Code with Synthesis-Friendly Renormalization
-
-module stage_execute_f(
-
-    //inputs from system
-    input logic clk_i,
-    input logic rst_i,
-
-    //input from the EXECUTION block (the flags) in order to clear or hold in case of jump or HALT
-    input logic [`FLAGS_NR-1:0] flags_i,
-
-    //inputs from the READ_EXECUTE pipeline register
-    input logic [`D_BITS-1:0] data_1_i,
-    input logic [`D_BITS-1:0] data_2_i,
-    input logic [6:0] opcode_i,
-    input logic [2:0] dest_i,
-
-    //output to the WRITE_BACK stage
-    output logic [2:0] dest_o,
-    output logic [`D_BITS-1:0] write_back_result_o
-);
-
-    // Intermediate variables
-    logic [23:0] mant_tmp;
-    logic [23:0] mant_tmp_s4;
-    logic [7:0] exp_tmp;
-    logic [7:0] exp_tmp_s4;
-    logic [23:0] mant_a;
-    logic [23:0] mant_b;
-    logic [24:0] mant_result;  // One extra bit for carry/borrow
-    logic sign_result;
-
-    // Intermediary outputs between the 4 internal registers
-    // outputs of r1
-    logic [`D_BITS-1:0] data_1_s1;
-    logic [`D_BITS-1:0] data_2_s1;
-    logic [1:0] comparison_s; // Result of the comparison; if comparison_s == 1, it means that R1 has the larger exponent, if comparison_s == 2 R2 has the larger exponent, else they are equal
-
-    // outputs of r2
-    logic [`D_BITS-1:0] data_1_s2;
-    logic [`D_BITS-1:0] data_2_s2;
-
-    // outputs of r3
-    logic [2:0] dest_s3;
-    logic [`D_BITS-1:0] write_back_result_s3;
-
-    // outputs of r4
-    logic [2:0] dest_s4;
-    logic [`D_BITS-1:0] write_back_result_s4;
-
-    // PIPELINE REGISTERS used to implement the action of EXF, as described in the assignment
-
-    // r1 -> comparison
-    always_ff @(posedge clk_i or negedge rst_i) begin
-        if (!rst_i) begin
-            data_1_s1 <= 0;
-            data_2_s1 <= 0;
-            comparison_s <= 0;
-        end else begin
-            if (data_1_i[`F_E_FLOP] > data_2_i[`F_E_FLOP]) begin
-                comparison_s <= 1;
-                data_1_s1 <= data_1_i;
-                data_2_s1 <= data_2_i;
-            end else if (data_1_i[`F_E_FLOP] < data_2_i[`F_E_FLOP]) begin
-                comparison_s <= 2;
-                data_1_s1 <= data_1_i;
-                data_2_s1 <= data_2_i;
-            end else begin
-                comparison_s <= 0;
-                data_1_s1 <= data_1_i;
-                data_2_s1 <= data_2_i;
-            end
-        end
-    end
-
-    // r2 -> alignment
-    always_ff @(posedge clk_i or negedge rst_i) begin
-        if (!rst_i) begin
-            data_1_s2 <= 0;
-            data_2_s2 <= 0;
-            sign_result <= 0;
-            mant_a <= 0;
-            mant_b <= 0;
-            exp_tmp <= 0;
-        end else begin
-            if (comparison_s == 0) begin
-                data_1_s2 <= data_1_s1;
-                data_2_s2 <= data_2_s1;
-            end else if (comparison_s == 1) begin // if R1 has a larger exponent, we need to align R2
-                data_1_s2 <= data_1_s1;
-                data_2_s2 <= {data_2_s1[`D_BITS-1], data_2_s1[`F_E_FLOP], data_2_s1[`F_M_FLOP] >> (data_1_s1[`F_E_FLOP] - data_2_s1[`F_E_FLOP])};
-            end else if (comparison_s == 2) begin // if R2 has a larger exponent, we need to align R1
-                data_1_s2 <= {data_1_s1[`D_BITS-1], data_1_s1[`F_E_FLOP], data_1_s1[`F_M_FLOP] >> (data_2_s1[`F_E_FLOP] - data_1_s1[`F_E_FLOP])};
-                data_2_s2 <= data_2_s1;
-            end else begin
-                data_1_s2 <= data_1_s1;
-                data_2_s2 <= data_2_s1;
-            end
-            sign_result <= data_1_s2[31];
-            mant_a <= {1'b1, data_1_s2[`F_M_FLOP]};
-            mant_b <= {1'b1, data_2_s2[`F_M_FLOP]};
-            exp_tmp <= (comparison_s == 1) ? data_1_s2[`F_E_FLOP] : data_2_s2[`F_E_FLOP];
-        end
-    end
-
-    // r3 -> addition
-    always_ff @(posedge clk_i or negedge rst_i) begin
-        if (!rst_i) begin
-            write_back_result_s3 <= 0;
-            dest_s3 <= 0;
-            mant_result <= 0;
-        end else begin
-            dest_s3 <= dest_i;
-
-            if (data_1_s2[31] == data_2_s2[31]) begin // Same signs
-                if (opcode_i == `ADDF) begin
-                    mant_result <= mant_a + mant_b;
-                end else if (opcode_i == `SUBF) begin
-                    mant_result <= mant_a - mant_b;
-                end
-            end else begin // Different signs
-                if (opcode_i == `ADDF) begin
-                    mant_result <= mant_a - mant_b;
-                end else if (opcode_i == `SUBF) begin
-                    mant_result <= mant_a + mant_b;
-                end
-            end
-
-            write_back_result_s3 <= {sign_result, exp_tmp, mant_result[22:0]}; // Discard extra bit
-        end
-    end
-
-    // r4 -> renormalization
-    always_ff @(posedge clk_i or negedge rst_i) begin
-        if (!rst_i) begin
-            write_back_result_s4 <= 0;
-            dest_s4 <= 0;
-            mant_tmp_s4 <= 0;
-            exp_tmp_s4 <= 0;
-        end else begin
-            dest_s4 <= dest_s3;
-
-            mant_tmp_s4 <= {1'b1, write_back_result_s3[`F_M_FLOP]};
-            exp_tmp_s4 <= write_back_result_s3[`F_E_FLOP];
-
-            // Normalize the result without using while loops
-            if (mant_tmp_s4[23] == 0 && exp_tmp_s4 != 0) begin
-                if (mant_tmp_s4[22]) begin
-                    mant_tmp_s4 <= mant_tmp_s4 << 1;
-                    exp_tmp_s4 <= exp_tmp_s4 - 1;
-                end
-                if (mant_tmp_s4[21]) begin
-                    mant_tmp_s4 <= mant_tmp_s4 << 2;
-                    exp_tmp_s4 <= exp_tmp_s4 - 2;
-                end
-                if (mant_tmp_s4[19]) begin
-                    mant_tmp_s4 <= mant_tmp_s4 << 4;
-                    exp_tmp_s4 <= exp_tmp_s4 - 4;
-                end
-                if (mant_tmp_s4[15]) begin
-                    mant_tmp_s4 <= mant_tmp_s4 << 8;
-                    exp_tmp_s4 <= exp_tmp_s4 - 8;
-                end
-                if (mant_tmp_s4[7]) begin
-                    mant_tmp_s4 <= mant_tmp_s4 << 16;
-                    exp_tmp_s4 <= exp_tmp_s4 - 16;
-                end
-            end else if (mant_tmp_s4[24]) begin
-                // Right shift if there's a carry bit
-                mant_tmp_s4 <= mant_tmp_s4 >> 1;
-                exp_tmp_s4 <= exp_tmp_s4 + 1;
-            end
-
-            write_back_result_s4 <= { write_back_result_s3[`D_BITS-1], exp_tmp_s4, mant_tmp_s4[22:0] };
-        end
-    end
-
-    // PIPELINE REGISTER between EXECUTE and WRITE BACK
-
-    // register used to transport dest_o
-    always_ff @(posedge clk_i or negedge rst_i) begin
-        if (!rst_i) begin
-            dest_o <= 0;
-        end else begin
-            if ((flags_i == `JUMP_ADD) || (flags_i == `JUMP_SIMPLE)) begin
-                dest_o <= 0;
-            end else begin
-                dest_o <= dest_s4;
-            end
-        end
-    end
-
-    // register used to transport write_back_result_o
-    always_ff @(posedge clk_i or negedge rst_i) begin
-        if (!rst_i) begin
-            write_back_result_o <= 0;
-        end else begin
-            if ((flags_i == `JUMP_ADD) || (flags_i == `JUMP_SIMPLE)) begin
-                write_back_result_o <= 0;
-            end else begin
-                write_back_result_o <= write_back_result_s4;
-            end
-        end
-    end
-
-endmodule
-
-Explanation of the Synthesis-Friendly Normalization Logic
-
-Initialization:
-
-mant_tmp_s4 is initialized with the mantissa and the implicit leading bit.
-exp_tmp_s4 is initialized with the exponent of the result.
-Normalization Process:
-
-Left Shift (Normalization):
-
-Instead of using a while loop, we use a series of conditional checks and fixed shifts.
-Each condition checks specific bits of the mantissa to determine if a shift is required.
-For example, if mant_tmp_s4[22] is set, shift by 1 bit; if mant_tmp_s4[21] is set, shift by 2 bits, and so on.
-This ensures that the normalization can be synthesized properly.
-Right Shift (Handle Carry Bit):
-
-If mant_tmp_s4[24] (the 24th bit, indicating a carry from addition) is set, it indicates that the mantissa needs a right shift.
-The mantissa is shifted right by one bit, and the exponent is incremented by one.
-Final Result Assembly:
-
-The normalized mantissa and adjusted exponent are packed into write_back_result_s4.
-
-Conclusion
-
-By avoiding the use of while loops and employing fixed shifts based on specific bit checks, the updated normalization process ensures synthesis-friendly implementation while still correctly normalizing the mantissa. This approach adheres to synthesis guidelines and provides a robust solution for the renormalization step.
-
-
-Questions to Clarify the Topic
-
-Do you need to handle special cases like NaN, infinity, or subnormal numbers in your implementation?
-What precision of floating-point numbers are you working with (e.g., single precision, double precision)?
-Do you require any specific rounding modes, or is basic truncation sufficient?
-Are there any constraints on the hardware resources available for this implementation?
-How would you like to handle overflow and underflow conditions in the final design?
-
-Feel free to ask for further details or any specific modifications to the provided explanation and code!
- * 
- * 
- * 
- */	
-	
-	
-//r4    ->renormalization
-    always_ff @(posedge clk_i or negedge rst_i) begin
-        if (!rst_i) begin
-            write_back_result_s4 <= 0;
-            dest_s4 <= 0;
-            mant_tmp_s4 <= 0;
-            exp_tmp_s4 <= 0;
-        end else begin
-            dest_s4 <= dest_s3;
-
-            mant_tmp_s4 <= {1'b1, write_back_result_s3[`F_M_FLOP]};
-            exp_tmp_s4 <= write_back_result_s3[`F_E_FLOP];
-
-            // Normalize the result
-            if (mant_tmp_s4[23] == 0 && exp_tmp_s4 != 0) begin
-                // Left shift until the MSB is 1
-                while (mant_tmp_s4[23] == 0 && exp_tmp_s4 > 0) begin
-                    mant_tmp_s4 <= mant_tmp_s4 << 1;
-                    exp_tmp_s4 <= exp_tmp_s4 - 1;
-                end
-            end else if (mant_tmp_s4[24]) begin
-                // Right shift if there's a carry bit
-                mant_tmp_s4 <= mant_tmp_s4 >> 1;
-                exp_tmp_s4 <= exp_tmp_s4 + 1;
-            end
-
-            write_back_result_s4 <= { write_back_result_s3[`D_BITS-1], exp_tmp_s4, mant_tmp_s4[22:0] };
-        end
-    end
-
+	assign dest_r4_o = dest_s4; //assignation used to connect the output to the data_forwarding block with the final register of the floating_point operation 
 
 
 	//PIPELINE REGISTER between EXECUTE and WRITE BACK
@@ -581,6 +285,13 @@ Feel free to ask for further details or any specific modifications to the provid
 				dest_o <= 0;
 
 			end
+
+			else if ( ( flags_i == `STOP ) || (stall_flag_i) ) begin
+
+				dest_o <= dest_o;
+
+			end
+
 			else begin
 
 				dest_o <= dest_s4;
@@ -603,6 +314,11 @@ Feel free to ask for further details or any specific modifications to the provid
 				write_back_result_o <= 0;
 
 			end
+			else if ( ( flags_i == `STOP ) || (stall_flag_i) ) begin
+
+				write_back_result_o <= write_back_result_o;
+
+			end
 			else begin
 
 				write_back_result_o <= write_back_result_s4;
@@ -614,7 +330,6 @@ Feel free to ask for further details or any specific modifications to the provid
 
 
 endmodule
-
 
 
 
