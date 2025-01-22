@@ -26,6 +26,7 @@ module stage_execute(
 
 		output logic [2:0] dest_o,
 		output logic [`D_BITS-1:0] write_back_result_o,
+		output logic [`D_BITS-1:0] alu_result_o,
 		output logic [`FLAGS_NR-1:0] flags_o, //flags_o output is used in order to deocde what the operation will actually do
 
 		//output to the FETCH stage (used when a JUMP instruction has been processed
@@ -76,6 +77,8 @@ module stage_execute(
 
 	//intermediary variable used to transport from the ALU, the result of the operation to the Intermediary Pipeline Register between EXECUTE and WRITE_BACK stages
 	assign write_back_result_s = ((flags_s == `WRITE) || (flags_s == `READ) ) ? result_s : 0;
+
+	assign alu_result_o = write_back_result_s;
 
 	assign execute_fetch_jump_value_s = ((flags_s == `JUMP_SIMPLE) || (flags_s == `JUMP_ADD) ) ? result_s[`A_BITS-1:0] : 0;
 
