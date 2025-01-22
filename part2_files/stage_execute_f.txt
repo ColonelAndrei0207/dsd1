@@ -33,8 +33,6 @@ module stage_execute_f(
 		input logic clk_i,
 		input logic rst_i,
 
-		input logic stall_flag_i,
-
 		//input from the EXECUTION block (the flags) in order to clear or hold in case of jump or HALT
 		input logic [`FLAGS_NR-1:0] flags_i,
 
@@ -47,6 +45,7 @@ module stage_execute_f(
 
 		//output from r4 to the data_forwarding block
 		output logic [2:0] dest_r4_o,
+		output logic [`D_BITS-1:0] write_back_result_s4_o,
 
 		//output to the WRITE_BACK stage
 
@@ -60,8 +59,8 @@ module stage_execute_f(
 	logic [7:0] exp_tmp;
 	logic [7:0] exp_tmp_s4;
 	// Extract mantissas with implicit leading bit
-	logic [23:0] mant_a;
-	logic [23:0] mant_b;
+	logic [23:0] mant_a; //one extra bit for allignment purpose 
+	logic [23:0] mant_b; //one extra bit for allignment purpose
 	logic [24:0] mant_result;  // One extra bit for carry/borrow
 
 	logic [24:0] mant_tmp_s4;
@@ -75,10 +74,13 @@ module stage_execute_f(
 	logic [`D_BITS-1:0] data_1_s1;
 	logic [`D_BITS-1:0] data_2_s1;
 	logic [1:0] comparison_s; //result of the comparison; if comparison_s == 1, it means that R1 has the larger exponent, if comparison_s == 2 R2 has the larger exponent, else they are equal
+	logic [2:0] dest_s1;
+
 
 	//outputs of r2
 	logic [`D_BITS-1:0] data_1_s2;
 	logic [`D_BITS-1:0] data_2_s2;
+	logic [2:0] dest_s2;
 
 	//outputs of r3
 	logic [2:0] dest_s3;
@@ -99,10 +101,12 @@ module stage_execute_f(
 			data_1_s1 <= 0;
 			data_2_s1 <= 0;
 			comparison_s <= 0;
+			dest_s1 <= 0;
 
 		end
 		else begin
-
+			dest_s1 <= dest_i;
+			
 			if ( data_1_i[`F_E_FLOP] > data_2_i[`F_E_FLOP] ) begin
 
 				comparison_s <= 1;
@@ -138,10 +142,13 @@ module stage_execute_f(
 			mant_a <=0;
 			mant_b <=0;
 			exp_tmp<=0;
+			dest_s2 <= 0; 
 
 
 		end
 		else begin
+			dest_s2 <= dest_s1;
+			
 			if ( comparison_s == 0 ) begin
 
 				data_1_s2 <= data_1_s1;
@@ -190,7 +197,7 @@ module stage_execute_f(
 
 		end
 		else begin
-			dest_s3 <= dest_i;
+			dest_s3 <= dest_s2;
 
 			// Determine the exponent for the result
 
@@ -230,7 +237,7 @@ module stage_execute_f(
 			mant_tmp_s4 <= mant_result; //we need to have the extra one for the calculation and the extra zero in case of the carry
 			exp_tmp_s4 <= write_back_result_s3[`F_E_FLOP];
 
-			if(mant_tmp_s4[24]) begin //handle overflow
+			if(mant_tmp_s4[23]) begin //handle overflow
 
 				mant_tmp_s4 <= mant_tmp_s4 >>1;
 				exp_tmp_s4 <= exp_tmp_s4 +1;
@@ -268,7 +275,7 @@ module stage_execute_f(
 
 
 	assign dest_r4_o = dest_s4; //assignation used to connect the output to the data_forwarding block with the final register of the floating_point operation 
-
+	assign write_back_result_s4_o = write_back_result_s4;
 
 	//PIPELINE REGISTER between EXECUTE and WRITE BACK
 
@@ -286,7 +293,7 @@ module stage_execute_f(
 
 			end
 
-			else if ( ( flags_i == `STOP ) || (stall_flag_i) ) begin
+			else if (  flags_i == `STOP  ) begin
 
 				dest_o <= dest_o;
 
@@ -314,7 +321,7 @@ module stage_execute_f(
 				write_back_result_o <= 0;
 
 			end
-			else if ( ( flags_i == `STOP ) || (stall_flag_i) ) begin
+			else if  ( flags_i == `STOP )  begin
 
 				write_back_result_o <= write_back_result_o;
 
