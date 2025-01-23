@@ -1,9 +1,9 @@
  /*  GOLDEN MODEL file
   *  Used for the DSD1 project
+  *
   */
 
- `include "/home/digdevel/training/nodm/default/units/etti_colonel/source/rtl/defines.svh"
-
+ `include "D:/FACULTATE/MASTER AM/semestrul 1/DSD1/sursa/tema1/golden_model.srcs/sources_1/new/defines.vh"
 
 module seq_core(
 		// general
@@ -56,10 +56,12 @@ module seq_core(
 			//error
 			$display("%0t weird situation we have here",$time() );
 		end
+		read = 0;
+		write = 0;
 	endfunction
 
 	//main process block
-	always_ff @(posedge clk, negedge rst) begin
+	always_ff @(posedge clk) begin
 
 		if (rst == 0) begin
 			gen_reg[0] <=0;
@@ -199,8 +201,13 @@ module seq_core(
 						write <= 1;
 					end
 
-					default: pc <= pc;
-
+					default:
+					begin
+					   pc <= pc;
+					   read <=0;
+					   write <=0;
+					end
+					   
 				endcase
 
 			end
