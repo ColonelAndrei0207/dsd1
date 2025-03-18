@@ -1,0 +1,28 @@
+/*
+fpga modlue - incapsulates the modules used in the RISC PC
+
+it contains the UART driver, memory controller, memory and RISC core,
+
+*/
+
+
+module fpga(
+	
+	
+	
+	);
+	
+	axi_lite_interface axi_if;
+	
+//UART Driver SLAVE
+
+
+//mem_ctrl MASTER
+mem_ctrl ctrl(
+	
+	.axi_if(axi_if.master)
+	
+	);
+
+endmodule
+	

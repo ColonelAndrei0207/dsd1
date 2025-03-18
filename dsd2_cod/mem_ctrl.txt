@@ -1,0 +1,83 @@
+/* 
+ * memory controller module file
+ * it contains the description of the memory controller used in the DSD project
+ * 
+ * Modlue contains 2 sets of interfaces:
+ * 	1. AXI4-Lite interface that connects the controller with the UART driver IP taken from the Xilinx library
+ * 	2. Simple interface linked with the memory file used by the RISC core
+ * 
+ * Memory controller will use a FSM to analyze the information taken from the UART driver and send to the memory the desired inputs
+ * Inputs can be:
+ *    - reset (resets and then stops the Simple RISC PC)
+      - halt  (stops the Simple RISC PC)
+      - start (enables the Simple RISC PC)
+      - write memory from a start address a given number of memory words. The packet contains the command, the start address, the length, and the data payload.
+      - read memory from the start address a given number of memory words. The packet contains the command, the start address, and the length. 
+      
+ * FSM diagram can be found in the documentation
+ * 
+ * 
+
+*/
+
+
+module mem_ctrl (
+	
+	//axi interface with master modport
+	axi_lite_interface.master axi_if,
+	
+	//interface linking the controller with the data memory
+	input logic [`D_BITS-1:0] data_in_i,
+	input logic [`A_BITS-1:0] addr_in_i,
+	
+	output logic [`D_BITS-1:0] data_out_o,
+	output logic [`A_BITS-1:0] addr_out_o,
+	
+	//interface linking the controller with the instruction memory
+	output logic [`A_BITS-1:0] instr_addr_out_o,
+	output logic [`A_SIZE-1:0] instr_out_o
+	);
+	
+	
+	//intermediary wires used in the design
+	
+	
+	//general register that stores the information received either from the memory or the driver 
+	
+	
+	
+	//actual FSM implementation
+
+	//always_ff process that transitions from one state to the other, in synch with the system clock
+	always_ff @(posedge axi_if.a_clk, negedge axi_if.a_reset_n) begin
+	
+		if(!axi_if.a_reset_n) begin
+			
+			
+		end
+		else begin
+			
+			
+		end	
+	end
+	
+	
+	//always_comb process that sets the conditions for the transitions
+	always_comb begin
+		
+		
+	end
+	
+	
+	//always_comb process that sets the output signals for each case
+	always_comb begin
+		
+		
+	end
+	
+	
+endmodule
+
+
+
+
