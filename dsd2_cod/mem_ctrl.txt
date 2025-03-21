@@ -1,82 +1,381 @@
-/* 
+/*
  * memory controller module file
  * it contains the description of the memory controller used in the DSD project
- * 
+ *
  * Modlue contains 2 sets of interfaces:
- * 	1. AXI4-Lite interface that connects the controller with the UART driver IP taken from the Xilinx library
- * 	2. Simple interface linked with the memory file used by the RISC core
- * 
+ *  1. AXI4-Lite interface that connects the controller with the UART driver IP taken from the Xilinx library
+ *  2. Simple interface linked with the memory file used by the RISC core
+ *
  * Memory controller will use a FSM to analyze the information taken from the UART driver and send to the memory the desired inputs
  * Inputs can be:
  *    - reset (resets and then stops the Simple RISC PC)
-      - halt  (stops the Simple RISC PC)
-      - start (enables the Simple RISC PC)
-      - write memory from a start address a given number of memory words. The packet contains the command, the start address, the length, and the data payload.
-      - read memory from the start address a given number of memory words. The packet contains the command, the start address, and the length. 
-      
- * FSM diagram can be found in the documentation
- * 
- * 
+ - halt  (stops the Simple RISC PC)
+ - start (enables the Simple RISC PC)
+ - write memory from a start address a given number of memory words. The packet contains the command, the start address, the length, and the data payload.
+ - read memory from the start address a given number of memory words. The packet contains the command, the start address, and the length.
 
-*/
+ * FSM diagram can be found in the documentation
+ *
+ *
+
+ */
 
 
 module mem_ctrl (
-	
-	//axi interface with master modport
-	axi_lite_interface.master axi_if,
-	
-	//interface linking the controller with the data memory
-	input logic [`D_BITS-1:0] data_in_i,
-	input logic [`A_BITS-1:0] addr_in_i,
-	
-	output logic [`D_BITS-1:0] data_out_o,
-	output logic [`A_BITS-1:0] addr_out_o,
-	
-	//interface linking the controller with the instruction memory
-	output logic [`A_BITS-1:0] instr_addr_out_o,
-	output logic [`A_SIZE-1:0] instr_out_o
+
+		//axi interface with master modport
+		axi_lite_interface.master axi_if,
+
+		//interface linking the controller with the data memory
+		input logic [`D_BITS-1:0] data_in_i,
+		input logic [`A_BITS-1:0] addr_in_i,
+
+		input logic mem_ready,
+
+		output logic [`D_BITS-1:0] data_out_o,
+		output logic [`A_BITS-1:0] addr_out_o,
+		output logic data_we,
+
+		//interface linking the controller with the instruction memory
+		output logic [`A_BITS-1:0] instr_addr_out_o,
+		output logic [`A_SIZE-1:0] instr_out_o,
+		output logic instr_we
 	);
-	
-	
+
+
+	//enum used for the definition of the FSM states;
+	enum logic [3:0] {
+		//reset state
+		IDLE        = 4'b0000,
+
+		//states used when we receive info from driver
+		RD_ADDR     = 4'b0001,
+		RD_DATA     = 4'b0010,
+		//  RD_RESP     = 4'b0011,
+
+		//states used when we send info from driver
+		WR_ADDR     = 4'b0100,
+		WR_DATA     = 4'b0101,
+		WR_RESP     = 4'b0110,
+
+		//state used to decrypt the info from the driver
+		DECRYPT     = 4'b0111,
+
+		//states used when communicating with memory
+		MEM_WRITE   = 4'b1000,
+		MEM_READ    = 4'b1001,
+
+		MEM_READY   = 4'b1010,
+
+		//state used as default
+		ERROR       = 4'b1111
+	} state_s, state_next_s;
+
+
 	//intermediary wires used in the design
-	
-	
-	//general register that stores the information received either from the memory or the driver 
-	
-	
-	
+
+	logic data_received_s;  //signal used to indicate that data has been received from UART driver and we are ready to decrypt
+	logic write_to_mem_s;   //signal used to indicate if we want to write into memory
+	logic read_to_mem_s;    //signal used to indicate if we want to read from memory
+	logic error;            //signal used to indicate if an erroneous transfer has been received
+
+
+	//general register that stores the information received either from the memory or the driver
+
+
+
 	//actual FSM implementation
 
 	//always_ff process that transitions from one state to the other, in synch with the system clock
 	always_ff @(posedge axi_if.a_clk, negedge axi_if.a_reset_n) begin
-	
+
 		if(!axi_if.a_reset_n) begin
-			
-			
+
+			state_s <= IDLE;
+
 		end
 		else begin
-			
-			
-		end	
+
+			state_s <= state_next_s;
+
+		end
 	end
-	
-	
+
+
 	//always_comb process that sets the conditions for the transitions
 	always_comb begin
-		
-		
+
+		state_next_s = state_s;
+
+		case(state_s)
+
+			IDLE: begin
+
+				if(axi_if.ar_ready) begin
+
+					state_next_s = RD_ADDR;
+
+				end
+				else begin
+
+					state_next_s = IDLE;
+
+				end
+			end
+
+			RD_ADDR: begin
+
+				if(axi_if.r_valid) begin
+
+					state_next_s = RD_DATA;
+
+				end
+				else begin
+
+					state_next_s = RD_ADDR;
+				end
+			end
+
+			RD_DATA: begin
+
+				if(data_received_s) begin
+
+					state_next_s = DECRYPT;
+
+				end
+				else begin
+
+					state_next_s = RD_DATA;
+
+				end
+			end
+
+
+			DECRYPT: begin
+
+				if(write_to_mem_s) begin
+
+					state_next_s = MEM_WRITE;
+
+				end
+				else if (read_to_mem_s) begin
+
+					state_next_s = MEM_READ;
+
+				end
+				else begin
+
+					state_next_s = DECRYPT;
+
+				end
+			end
+
+			MEM_WRITE: begin
+
+				if (mem_ready) begin
+
+					state_next_s = IDLE;
+
+				end
+				else begin
+
+					state_next_s = MEM_WRITE;
+
+				end
+			end
+
+			MEM_READ: begin
+
+				state_next_s = MEM_READY;
+
+			end
+
+
+			MEM_READY: begin
+
+				if (mem_ready) begin
+
+					state_next_s = WR_ADDR;
+
+				end
+				else begin
+
+					state_next_s = MEM_READ;
+
+				end
+			end
+
+
+			WR_ADDR: begin
+
+				if (axi_if.aw_valid) begin
+
+					state_next_s = WR_DATA;
+
+				end
+				else begin
+
+					state_next_s = WR_ADDR;
+
+				end
+			end
+
+
+			WR_DATA: begin
+
+				if(axi_if.w_ready) begin
+
+					state_next_s = WR_RESP;
+
+				end
+				else begin
+
+					state_next_s = WR_DATA;
+
+				end
+			end
+
+			WR_RESP: begin
+
+				if(axi_if.b_valid) begin
+
+					state_next_s = IDLE;
+
+				end
+				else begin
+
+					state_next_s = WR_RESP;
+
+				end
+			end
+
+
+			ERROR: begin
+
+				if (!error) begin
+
+					state_next_s = IDLE;
+
+				end
+				else begin
+
+					state_next_s = ERROR;
+
+				end
+			end
+
+			default: begin
+
+				state_next_s = ERROR;
+
+			end
+		endcase
 	end
-	
-	
+
+
 	//always_comb process that sets the output signals for each case
 	always_comb begin
-		
-		
+
+		axi_if.ar_valid = 0;
+		axi_if.ar_addr = 0;
+		axi_if.ar_prot = 0;
+		axi_if.r_ready = 0;
+		axi_if.aw_valid = 0;
+		axi_if.aw_addr = 0;
+		axi_if.aw_prot = 0;
+		axi_if.w_valid = 0;
+		axi_if.w_data = 0;
+		axi_if.w_strb = 0;
+
+		case(state_s)
+
+			IDLE: begin
+
+
+			end
+
+			RD_ADDR: begin
+
+				axi_if.ar_valid = 1;
+				axi_if.ar_addr = 0; //value of the address in the Rx FIFO register
+				axi_if.ar_prot = 3'b001; //value given to the ARPROT signal, so that we have a privileged, secure data access
+				
+			end
+
+			RD_DATA: begin
+
+				axi_if.r_ready = 1; //we are ready to receive info 
+
+			end
+
+
+			DECRYPT: begin
+
+				
+
+			end
+
+			MEM_WRITE: begin
+
+
+			end
+
+			MEM_READ: begin
+
+
+
+			end
+
+
+			MEM_READY: begin
+
+
+			end
+
+
+			WR_ADDR: begin
+
+
+			end
+
+
+			WR_DATA: begin
+
+
+			end
+
+			WR_RESP: begin
+
+
+			end
+
+
+			ERROR: begin
+
+
+			end
+
+			default: begin
+
+				axi_if.ar_valid = 0;
+				axi_if.ar_addr = 0;
+				axi_if.ar_prot = 0;
+				axi_if.r_ready = 0;
+				axi_if.aw_valid = 0;
+				axi_if.aw_addr = 0;
+				axi_if.aw_prot = 0;
+				axi_if.w_valid = 0;
+				axi_if.w_data = 0;
+				axi_if.w_strb = 0;
+
+			end
+		endcase
+
 	end
-	
-	
+
+
 endmodule
+
 
 
 
