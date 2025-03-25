@@ -13,6 +13,8 @@
  `define CST_NR_BITS 8
  `define SIGN_BITS 1
  
+ `define UART_PAYLOAD 8
+ 
  `define MEM_SIZE (1<<((`A_SIZE)-2))
  
  `define M_BITS 23
