@@ -42,338 +42,370 @@ module mem_ctrl (
 		output logic instr_we
 	);
 
+	//interconnecting wires
+	
+	logic [ 1 : 0] axi_request_type_s;
+	logic [ `D_BITS-1 : 0] axi_data_in_s;
+	logic [ `D_BITS-1 : 0] axi_data_out_s;
 
-	//enum used for the definition of the FSM states;
-	enum logic [3:0] {
-		//reset state
-		IDLE        = 4'b0000,
 
-		//states used when we receive info from driver
-		RD_ADDR     = 4'b0001,
-		RD_DATA     = 4'b0010,
-		//  RD_RESP     = 4'b0011,
+	i_o_axi driver_connection(
 
-		//states used when we send info from driver
-		WR_ADDR     = 4'b0100,
-		WR_DATA     = 4'b0101,
-		WR_RESP     = 4'b0110,
+		.axi_if(axi_if),
+		.request_type_i(axi_request_type_s),
 
-		//state used to decrypt the info from the driver
-		DECRYPT     = 4'b0111,
+		.data_in_i(axi_data_in_s),
+		.data_out_o(axi_data_out_s)
 
-		//states used when communicating with memory
-		MEM_WRITE   = 4'b1000,
-		MEM_READ    = 4'b1001,
+	);
 
-		MEM_READY   = 4'b1010,
+	
 
-		//state used as default
-		ERROR       = 4'b1111
-	} state_s, state_next_s;
+	/*
+	 //enum used for the definition of the FSM states;
+	 enum logic [3:0] {
+	 //reset state
+	 IDLE        = 4'b0000,
 
+	 //states used when we receive info from driver
+	 RD_ADDR     = 4'b0001,
+	 RD_DATA     = 4'b0010,
+	 //  RD_RESP     = 4'b0011,
 
-	//intermediary wires used in the design
+	 //states used when we send info from driver
+	 WR_ADDR     = 4'b0100,
+	 WR_DATA     = 4'b0101,
+	 WR_RESP     = 4'b0110,
 
-	logic data_received_s;  //signal used to indicate that data has been received from UART driver and we are ready to decrypt
-	logic write_to_mem_s;   //signal used to indicate if we want to write into memory
-	logic read_to_mem_s;    //signal used to indicate if we want to read from memory
-	logic error;            //signal used to indicate if an erroneous transfer has been received
+	 //state used to decrypt the info from the driver
+	 DECRYPT     = 4'b0111,
 
+	 //states used when communicating with memory
+	 MEM_WRITE   = 4'b1000,
+	 MEM_READ    = 4'b1001,
 
-	//general register that stores the information received either from the memory or the driver
+	 MEM_READY   = 4'b1010,
 
+	 //state used as default
+	 ERROR       = 4'b1111
+	 } state_s, state_next_s;
 
 
-	//actual FSM implementation
+	 //intermediary wires used in the design
 
-	//always_ff process that transitions from one state to the other, in synch with the system clock
-	always_ff @(posedge axi_if.a_clk, negedge axi_if.a_reset_n) begin
+	 logic data_received_s;  //signal used to indicate that data has been received from UART driver and we are ready to decrypt
+	 logic write_to_mem_s;   //signal used to indicate if we want to write into memory
+	 logic read_to_mem_s;    //signal used to indicate if we want to read from memory
+	 logic error;            //signal used to indicate if an erroneous transfer has been received
 
-		if(!axi_if.a_reset_n) begin
+	 logic [`UART_PAYLOAD - 1: 0] cnt_ctrl_s; //counter of the internal mem_ctrl
+	 logic [`UART_PAYLOAD - 1: 0] cnt_received_s; //value received from the driver, representing the length in the command
 
-			state_s <= IDLE;
+	 //general register that stores the information received either from the memory or the driver
+	 logic [ `D_BITS-1 : 0 ] gen_reg;
 
-		end
-		else begin
+	 //address register that gets the value of the address we want to write into / read from
+	 logic [`A_BITS-1:0] addr_s;
 
-			state_s <= state_next_s;
 
-		end
-	end
+	 //actual FSM implementation
 
+	 //always_ff process that transitions from one state to the other, in synch with the system clock
+	 always_ff @(posedge axi_if.a_clk, negedge axi_if.a_reset_n) begin
 
-	//always_comb process that sets the conditions for the transitions
-	always_comb begin
+	 if(!axi_if.a_reset_n) begin
 
-		state_next_s = state_s;
+	 state_s <= IDLE;
 
-		case(state_s)
+	 end
+	 else begin
 
-			IDLE: begin
+	 state_s <= state_next_s;
 
-				if(axi_if.ar_ready) begin
+	 end
+	 end
 
-					state_next_s = RD_ADDR;
 
-				end
-				else begin
+	 //always_comb process that sets the conditions for the transitions
+	 always_comb begin
 
-					state_next_s = IDLE;
+	 state_next_s = state_s;
 
-				end
-			end
+	 case(state_s)
 
-			RD_ADDR: begin
+	 IDLE: begin
 
-				if(axi_if.r_valid) begin
+	 if(axi_if.ar_ready) begin
 
-					state_next_s = RD_DATA;
+	 state_next_s = RD_ADDR;
 
-				end
-				else begin
+	 end
+	 else begin
 
-					state_next_s = RD_ADDR;
-				end
-			end
+	 state_next_s = IDLE;
 
-			RD_DATA: begin
+	 end
+	 end
 
-				if(data_received_s) begin
+	 RD_ADDR: begin
 
-					state_next_s = DECRYPT;
+	 if(axi_if.r_valid) begin
 
-				end
-				else begin
+	 state_next_s = RD_DATA;
 
-					state_next_s = RD_DATA;
+	 end
+	 else begin
 
-				end
-			end
+	 state_next_s = RD_ADDR;
+	 end
+	 end
 
+	 RD_DATA: begin
+	 //a state in which we wait for the command-type, so that in the decrypt state we can either go to mem_r or
+	 //continue receiving data from the driver, that will then begin a loop until there is no more data
 
-			DECRYPT: begin
+	 if(data_received_s) begin
 
-				if(write_to_mem_s) begin
+	 state_next_s = DECRYPT;
 
-					state_next_s = MEM_WRITE;
+	 end
+	 else begin
 
-				end
-				else if (read_to_mem_s) begin
+	 state_next_s = RD_DATA;
 
-					state_next_s = MEM_READ;
+	 end
+	 end
 
-				end
-				else begin
 
-					state_next_s = DECRYPT;
+	 DECRYPT: begin
 
-				end
-			end
+	 if(write_to_mem_s) begin
 
-			MEM_WRITE: begin
+	 state_next_s = MEM_WRITE;
 
-				if (mem_ready) begin
+	 end
+	 else if (read_to_mem_s) begin
 
-					state_next_s = IDLE;
+	 state_next_s = MEM_READ;
 
-				end
-				else begin
+	 end
+	 else begin
 
-					state_next_s = MEM_WRITE;
+	 state_next_s = DECRYPT;
 
-				end
-			end
+	 end
+	 end
 
-			MEM_READ: begin
+	 MEM_WRITE: begin
+	 //during this state we will have parallel processes, we receive data from the AXI interface, we have memorised the address to send, and at the next clock data is sent
+	 if ( (mem_ready) && ( cnt_ctrl_s == cnt_received_s ) ) begin
 
-				state_next_s = MEM_READY;
+	 state_next_s = IDLE;
 
-			end
+	 end
+	 else begin
 
+	 state_next_s = MEM_WRITE;
 
-			MEM_READY: begin
+	 end
+	 end
 
-				if (mem_ready) begin
+	 MEM_READ: begin
 
-					state_next_s = WR_ADDR;
+	 state_next_s = MEM_READY;
 
-				end
-				else begin
+	 end
 
-					state_next_s = MEM_READ;
 
-				end
-			end
+	 MEM_READY: begin
 
+	 if (mem_ready) begin
 
-			WR_ADDR: begin
+	 state_next_s = WR_ADDR;
 
-				if (axi_if.aw_valid) begin
+	 end
+	 else begin
 
-					state_next_s = WR_DATA;
+	 state_next_s = MEM_READ;
 
-				end
-				else begin
+	 end
+	 end
 
-					state_next_s = WR_ADDR;
 
-				end
-			end
+	 WR_ADDR: begin
 
+	 if (axi_if.aw_valid) begin
 
-			WR_DATA: begin
+	 state_next_s = WR_DATA;
 
-				if(axi_if.w_ready) begin
+	 end
+	 else begin
 
-					state_next_s = WR_RESP;
+	 state_next_s = WR_ADDR;
 
-				end
-				else begin
+	 end
+	 end
 
-					state_next_s = WR_DATA;
 
-				end
-			end
+	 WR_DATA: begin
 
-			WR_RESP: begin
+	 if(axi_if.w_ready) begin
 
-				if(axi_if.b_valid) begin
+	 state_next_s = WR_RESP;
 
-					state_next_s = IDLE;
+	 end
+	 else begin
 
-				end
-				else begin
+	 state_next_s = WR_DATA;
 
-					state_next_s = WR_RESP;
+	 end
+	 end
 
-				end
-			end
+	 WR_RESP: begin
 
+	 if(axi_if.b_valid) begin
 
-			ERROR: begin
+	 state_next_s = IDLE;
 
-				if (!error) begin
+	 end
+	 else begin
 
-					state_next_s = IDLE;
+	 state_next_s = WR_RESP;
 
-				end
-				else begin
+	 end
+	 end
 
-					state_next_s = ERROR;
 
-				end
-			end
+	 ERROR: begin
 
-			default: begin
+	 if (!error) begin
 
-				state_next_s = ERROR;
+	 state_next_s = IDLE;
 
-			end
-		endcase
-	end
+	 end
+	 else begin
 
+	 state_next_s = ERROR;
 
-	//always_comb process that sets the output signals for each case
-	always_comb begin
+	 end
+	 end
 
-		axi_if.ar_valid = 0;
-		axi_if.ar_addr = 0;
-		axi_if.ar_prot = 0;
-		axi_if.r_ready = 0;
-		axi_if.aw_valid = 0;
-		axi_if.aw_addr = 0;
-		axi_if.aw_prot = 0;
-		axi_if.w_valid = 0;
-		axi_if.w_data = 0;
-		axi_if.w_strb = 0;
+	 default: begin
 
-		case(state_s)
+	 state_next_s = ERROR;
 
-			IDLE: begin
+	 end
+	 endcase
+	 end
 
 
-			end
+	 //always_comb process that sets the output signals for each case
+	 always_comb begin
 
-			RD_ADDR: begin
+	 axi_if.ar_valid = 0;
+	 axi_if.ar_addr = 0;
+	 axi_if.ar_prot = 0;
+	 axi_if.r_ready = 0;
+	 axi_if.aw_valid = 0;
+	 axi_if.aw_addr = 0;
+	 axi_if.aw_prot = 0;
+	 axi_if.w_valid = 0;
+	 axi_if.w_data = 0;
+	 axi_if.w_strb = 0;
 
-				axi_if.ar_valid = 1;
-				axi_if.ar_addr = 0; //value of the address in the Rx FIFO register
-				axi_if.ar_prot = 3'b001; //value given to the ARPROT signal, so that we have a privileged, secure data access
-				
-			end
+	 case(state_s)
 
-			RD_DATA: begin
+	 IDLE: begin
 
-				axi_if.r_ready = 1; //we are ready to receive info 
 
-			end
+	 end
 
+	 RD_ADDR: begin
 
-			DECRYPT: begin
+	 axi_if.ar_valid = 1;
+	 axi_if.ar_addr = 0; //value of the address in the Rx FIFO register
+	 axi_if.ar_prot = 3'b001; //value given to the ARPROT signal, so that we have a privileged, secure data access
 
-				
+	 end
 
-			end
+	 RD_DATA: begin
 
-			MEM_WRITE: begin
+	 axi_if.r_ready = 1; //we are ready to receive info
 
+	 end
 
-			end
 
-			MEM_READ: begin
+	 DECRYPT: begin
 
 
 
-			end
+	 end
 
+	 MEM_WRITE: begin
 
-			MEM_READY: begin
 
+	 end
 
-			end
+	 MEM_READ: begin
 
 
-			WR_ADDR: begin
 
+	 end
 
-			end
 
+	 MEM_READY: begin
 
-			WR_DATA: begin
 
+	 end
 
-			end
 
-			WR_RESP: begin
+	 WR_ADDR: begin
 
 
-			end
+	 end
 
 
-			ERROR: begin
+	 WR_DATA: begin
 
 
-			end
+	 end
 
-			default: begin
+	 WR_RESP: begin
 
-				axi_if.ar_valid = 0;
-				axi_if.ar_addr = 0;
-				axi_if.ar_prot = 0;
-				axi_if.r_ready = 0;
-				axi_if.aw_valid = 0;
-				axi_if.aw_addr = 0;
-				axi_if.aw_prot = 0;
-				axi_if.w_valid = 0;
-				axi_if.w_data = 0;
-				axi_if.w_strb = 0;
 
-			end
-		endcase
+	 end
 
-	end
 
+	 ERROR: begin
 
+
+	 end
+
+	 default: begin
+
+	 axi_if.ar_valid = 0;
+	 axi_if.ar_addr = 0;
+	 axi_if.ar_prot = 0;
+	 axi_if.r_ready = 0;
+	 axi_if.aw_valid = 0;
+	 axi_if.aw_addr = 0;
+	 axi_if.aw_prot = 0;
+	 axi_if.w_valid = 0;
+	 axi_if.w_data = 0;
+	 axi_if.w_strb = 0;
+
+	 end
+	 endcase
+
+	 end
+
+	 //proccess that operates in the
+	 always_ff @ (posedge axi_if.a_clk, negedge axi_if.a_reset_n) begin
+
+
+	 end
+
+	 */
 endmodule
 
 
