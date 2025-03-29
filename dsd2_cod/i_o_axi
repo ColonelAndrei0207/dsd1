@@ -13,7 +13,7 @@ module i_o_axi(
 
 		output logic data_sent_fsm, //input that sends a flag to indicate that data has been sent to the fsm
 		//input from the main fsm that takes and translates the request
-		input logic [1:0] request_type_i,
+		input logic [2:0] request_type_i,
 
 		//data input and output to and from the main fsm (will transport each and every data received from the driver and will send memory data to the driver)
 		input logic [`D_BITS-1:0] data_in_i,
@@ -59,12 +59,12 @@ module i_o_axi(
 
 			IDLE: begin
 
-				if( (request_type_i == 1) || (request_type_i == 2) ) begin
+				if( (request_type_i == 1) || (request_type_i == 2) || (request_type_i == 3) ) begin //TODO: find a better solution
 
 					state_next_s = RD_ADDR;
 
 				end
-				else if (request_type_i == 3) begin
+				else if (request_type_i == 4) begin
 
 					state_next_s = WR_ADDR;
 
@@ -76,7 +76,7 @@ module i_o_axi(
 
 			RD_ADDR: begin
 
-				if ( request_type_i == 1 ) begin //if we want to check status
+				if ( request_type_i == 1 ) begin //if we want to check Rx FIFO status
 
 					axi_if.ar_addr = 8'h08;
 					axi_if.ar_valid = 1;
@@ -88,6 +88,12 @@ module i_o_axi(
 					axi_if.ar_valid = 1;
 
 				end
+				else if (request_type_i == 3) begin //if we check for Tx FIFO status TODO: find better implementation
+
+					axi_if.ar_addr = 8'h00;
+					axi_if.ar_valid = 1;
+
+				end				
 				else begin
 
 					axi_if.ar_addr = 0;
