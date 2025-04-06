@@ -1,0 +1,275 @@
+/*
+
+ description of the central unit of the mem controller:
+ 	It contains a fsm that states how the controller behaves:
+ 	when to look for data into the driver's status register
+ 	when to look for data in the driver's Rx FIFO
+ 	when to request to the memory data, so that it would be sent to the driver's Tx FIFO
+ 	
+ it will contain a counter, used when writing data into the memory
+ it will have a frequency divider, so that the current consumption would be lowered (also used to not ask every clock cycle for data in the status register)
+ it will ensure that the data received from the driver is properly translated, based on the command-byte given
+ 
+ */
+
+
+module fsm_mem_ctrl(
+
+		input logic sys_clk_i,
+		input logic sys_reset_n_i,
+
+		//signals related to the i_o_mem
+
+		input logic mem_ready,
+
+		output logic [`D_BITS-1:0] data_out_mem_o,
+		input logic [`D_BITS-1:0] data_in_mem_i,
+		output logic request_type_mem_o,
+
+		//signals related to the i_o_axi
+		input logic data_axi_pulse, //signal used to state that data has been received from the i_o
+
+		output logic [1:0] request_axi_type_o,
+
+		output logic [`D_BITS-1:0] data_out_axi_o,
+		input logic [`D_BITS-1:0] data_in_axi_i
+
+	);
+	
+	localparam timer_value = 100; //used now for testing
+
+	logic [ $clog2(timer_value) : 0 ] idle_tmr_s;
+	logic [`UART_PAYLOAD - 1: 0] cnt_ctrl_s; //counter of the internal mem_ctrl
+	logic [`UART_PAYLOAD - 1: 0] cnt_received_s; //value received from the driver, representing the length in the command
+
+	//general register that stores the information received either from the memory or the driver
+	logic [ `D_BITS-1 : 0 ] gen_reg;
+
+	//address register that gets the value of the address we want to write into / read from
+	logic [`A_BITS-1:0] addr_s;
+	
+	//bit used to signal if the decrypt phase is ok
+	logic decrypt_ok;
+	logic decrypt_error;
+	logic decrypt_send;
+	logic decrypt_get;
+	
+	
+
+
+	enum logic [ 2 : 0 ] (
+	
+		//reset state
+		IDLE = 0;
+		
+		//CHECK_RX state to look for data
+		CHECK_RX = 1;
+		
+		//we receive data and we start the decrypt phase (enters the state only on first data handshake)
+		DECRYPT = 2;
+		
+		//we start to read data from driver
+		READ_RX = 3;
+		
+		//if we have write operation, we start to send data to the mem; mini-loop starts until cnt_ctrl_s == cnt_received_s
+		SEND_DATA_TO_MEM = 4;
+		
+		//if decrypt phase gets a read command, send to i_o_mem command to get data from the address in command
+		GET_DATA_FROM_MEM = 5
+		
+		//send to i_o_axi the data from mem
+		SEND_TX = 5;
+		
+		//check for status, if TX NOT full, continue with another 4-byte data; else go to idle
+		CHECK_TX = 6;
+		
+		
+	) state_s, state_next_s;
+	
+	
+	//timer implementation
+	always_ff @ (posedge sys_clk_i, negedge sys_reset_n_i) begin
+	
+		if (!sys_reset_n_i) begin
+		
+			idle_tmr_s <= 0;
+		
+		end
+		else begin
+			
+			if(idle_tmr_s == timer_value) begin
+			
+				idle_tmr_s <= 0;
+				
+			end else begin
+			
+				idle_tmr_s <= idle_tmr_s+1;
+			
+			end
+		end
+		
+	end
+
+	//loading data into the gen_reg
+	always_ff @ (posedge sys_clk_i, negedge sys_reset_n_i) begin
+
+		if(!sys_reset_n_i) begin
+
+			gen_reg <=0;
+
+		end
+		else begin
+
+			if(data_axi_pulse) begin
+
+				gen_reg <= data_in_axi_i;
+
+			end
+			else if(mem_ready) begin
+
+				gen_reg <= data_in_mem_i;
+
+			end
+			else begin
+
+				gen_reg <= gen_reg;
+
+			end
+		end
+	end
+		
+	
+	//generating the FSM transitions
+		always_ff @ (posedge sys_clk_i , negedge sys_reset_n_i) begin
+
+		if(sys_reset_n_i) begin
+
+			state_s <= IDLE;
+
+		end
+		else begin
+
+			state_s <= state_next_s;
+
+		end
+	end
+
+	//fsm transitions
+		always_comb begin
+
+		state_next_s = state_s;
+		request_type_mem_o = 0;
+		request_axi_type_o = 0;
+
+		if (decrypt_error) begin
+		
+			state_next_s = IDLE;
+			
+		end
+		else begin
+		
+		case(state_s)
+			
+			IDLE: begin
+			
+				if(idle_tmr_s == timer_value) begin
+				
+					state_next_s = CHECK_RX;
+					request_axi_type_o = 1;
+				
+				end
+				else begin
+				
+					state_next_s = IDLE;
+					
+				end
+			
+			end
+
+			CHECK_RX: begin
+			
+				if( data_axi_pulse  && !decrypt_ok ) begin
+				
+					state_next_s = DECRYPT;
+				
+				end
+				else if ( data_axi_pulse && decrypt_ok ) begin
+				
+					state_next_s = READ_RX;
+				
+				end
+				else begin 
+				
+					state_next_s = CHECK_RX;
+					
+				end
+			end
+
+			DECRYPT: begin
+			
+				if(decrypt_ok) begin
+				
+					state_next_s = READ_RX;
+					request_axi_type_o = 2;
+					
+				end
+				else begin
+				
+					state_next_s = DECRYPT;
+					
+				end
+			
+			end
+
+			READ_RX: begin
+			
+				if (  ) begin //go back to check
+				
+				end
+				else if( decrypt_send && !decrypt_get ) begin //decide betwwen send and get (send)
+					
+					state_next_s = SEND_DATA_TO_MEM;
+				
+				end
+				else if ( !decrypt_send && decrypt_get ) begin //(get)
+				
+					state_next_s = GET_DATA_FROM_MEM;
+				
+				end
+			
+			end
+			
+			SEND_DATA_TO_MEM: begin
+			
+			
+			end
+
+			GET_DATA_FROM_MEM: begin
+			
+			
+			end
+
+			SEND_TX: begin 
+			
+			
+			end
+
+			CHECK_TX: begin
+			
+			
+			end			
+		
+			default: begin
+			
+				state_next_s = IDLE;
+				
+			end
+		endcase
+		end 
+		
+		end
+
+endmodule
+
+
+
