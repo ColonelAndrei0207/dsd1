@@ -14,6 +14,8 @@
  `define SIGN_BITS 1
  
  `define UART_PAYLOAD 8
+ `define AXI_REQ_NR 3
+ `define MEM_REQ_NR 2
  
  `define MEM_SIZE (1<<((`A_SIZE)-2))
  
