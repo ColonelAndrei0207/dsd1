@@ -30,8 +30,6 @@ module mem_ctrl (
 		input logic [`D_BITS-1:0] data_in_i,
 		input logic [`A_BITS-1:0] addr_in_i,
 
-		input logic mem_ready,
-
 		output logic [`D_BITS-1:0] data_out_o,
 		output logic [`A_BITS-1:0] addr_out_o,
 		output logic data_we,
@@ -43,23 +41,79 @@ module mem_ctrl (
 	);
 
 	//interconnecting wires
-	
-	logic [ 1 : 0] axi_request_type_s;
+
+	//connecting i_o_axi with the fsm
+	logic [`AXI_REQ_NR-1:0] axi_request_type_s;
+	logic data_sent_fsm_s;
 	logic [ `D_BITS-1 : 0] axi_data_in_s;
 	logic [ `D_BITS-1 : 0] axi_data_out_s;
 
+	//connecting i_o_mem with the fsm
+	logic data_mem_pulse_s;
+	logic [ `D_BITS-1 : 0] data_out_mem_s;
+	logic [ `D_BITS-1 : 0] data_in_mem_s;
+	logic [`MEM_REQ_NR-1:0] request_type_mem_s;
+	
+	
+	
 
-	i_o_axi driver_connection(
+
+	i_o_axi driver_connection_inst(
 
 		.axi_if(axi_if),
 		.request_type_i(axi_request_type_s),
+		.data_sent_fsm(data_sent_fsm_s),
 
 		.data_in_i(axi_data_in_s),
 		.data_out_o(axi_data_out_s)
 
 	);
 
-	
+	fsm_mem_ctrl fsm_inst(
+
+		.sys_clk_i(axi_if.a_clk),
+		.sys_reset_n_i(axi_if.a_reset_n),
+
+		.data_mem_pulse(data_mem_pulse_s),
+		.addr_out_mem_o(),
+		.data_out_mem_o(data_out_mem_s),
+		.data_in_mem_i(data_in_mem_s),
+		.request_type_mem_o(request_type_mem_s),
+
+		.data_axi_pulse(data_sent_fsm_s), //signal used to state that data has been received from the i_o
+
+		.request_type_axi_o(axi_request_type_s),
+
+		.data_to_axi_o(axi_data_in_s),
+		.data_from_axi_i(axi_data_out_s)
+
+	);
+
+	i_o_mem i_o_mem_inst (
+		
+		.sys_clk_i(axi_if.a_clk),
+		.sys_reset_n_i(axi_if.a_reset_n),
+
+		input logic [`D_BITS-1:0] data_in_i,
+		input logic [`A_BITS-1:0] addr_in_i,
+		input logic [`MEM_REQ_NR-1:0] command_i,
+
+		output logic [`D_BITS-1:0] data_ctrl_o,
+//      output logic [`A_BITS-1:0] address_ctrl_o,
+		output logic data_sent,
+
+		//link with the data memory
+		input logic  [`D_BITS-1:0] data_mem_in_i,
+		output logic [`D_BITS-1:0] data_out_o,
+		output logic [`A_BITS-1:0] data_addr_out_o,
+		output logic data_we,
+
+		// link with the instruction memory
+		output logic [`A_BITS-1:0] instr_addr_out_o,
+		output logic [`A_SIZE-1:0] instr_out_o,
+		output logic instr_we
+		
+		);
 
 	/*
 	 //enum used for the definition of the FSM states;
