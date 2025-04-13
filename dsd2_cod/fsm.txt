@@ -23,8 +23,9 @@ module fsm_mem_ctrl(
 		input logic mem_ready,
 
 		output logic [`D_BITS-1:0] data_out_mem_o,
+		output logic [`A_BITS-1:0] addr_mem_o,
 		input logic [`D_BITS-1:0] data_in_mem_i,
-		output logic request_type_mem_o,
+		output logic [`MEM_REQ_NR-1:0] request_type_mem_o,
 
 		//signals related to the i_o_axi
 		input logic data_axi_pulse, //signal used to state that data has been received from the i_o
@@ -42,6 +43,8 @@ module fsm_mem_ctrl(
 	logic [`UART_PAYLOAD - 1: 0] cnt_ctrl_s; //counter of the internal mem_ctrl
 	logic [`UART_PAYLOAD - 1: 0] cnt_received_s; //value received from the driver, representing the length in the command
 
+    logic [1:0] data_cnt; //mini-counter used to ensure that we fill-up the gen_reg with 32 bit data
+
 	//general register that stores the information received either from the memory or the driver
 	logic [ `D_BITS-1 : 0 ] gen_reg;
 
@@ -53,38 +56,39 @@ module fsm_mem_ctrl(
 	logic decrypt_error;
 	logic decrypt_send;
 	logic decrypt_get;
-	
-	
+	logic decrypt_data;
+	logic decrypt_instr;
+	logic tx_full;
 
 
-	enum logic [ 2 : 0 ] (
+	enum logic [ 2 : 0 ] {
 	
 		//reset state
-		IDLE = 0;
+		IDLE = 0,
 		
 		//CHECK_RX state to look for data
-		CHECK_RX = 1;
+		CHECK_RX = 1,
 		
 		//we receive data and we start the decrypt phase (enters the state only on first data handshake)
-		DECRYPT = 2;
-		
+		DECRYPT = 2,
+	
 		//we start to read data from driver
-		READ_RX = 3;
+		READ_RX = 3,
 		
 		//if we have write operation, we start to send data to the mem; mini-loop starts until cnt_ctrl_s == cnt_received_s
-		SEND_DATA_TO_MEM = 4;
+		SEND_DATA_TO_MEM = 4,
 		
 		//if decrypt phase gets a read command, send to i_o_mem command to get data from the address in command
-		GET_DATA_FROM_MEM = 5
+		GET_DATA_FROM_MEM = 5,
 		
 		//send to i_o_axi the data from mem
-		SEND_TX = 5;
+		SEND_TX = 5,
 		
 		//check for status, if TX NOT full, continue with another 4-byte data; else go to idle
-		CHECK_TX = 6;
+		CHECK_TX = 6
 		
 		
-	) state_s, state_next_s;
+	} state_s, state_next_s;
 	
 	
 	//timer implementation
@@ -160,6 +164,8 @@ module fsm_mem_ctrl(
 		state_next_s = state_s;
 		request_type_mem_o = 0;
 		request_axi_type_o = 0;
+		data_out_mem_o = 0;
+		addr_mem_o = 0;
 
 		if (decrypt_error) begin
 		
@@ -188,12 +194,12 @@ module fsm_mem_ctrl(
 
 			CHECK_RX: begin
 			
-				if( data_axi_pulse  && !decrypt_ok ) begin
+				if( data_axi_pulse  && !decrypt_ok ) begin //decrypt is entered only on first data read from RX, in order to get the command
 				
 					state_next_s = DECRYPT;
 				
 				end
-				else if ( data_axi_pulse && decrypt_ok ) begin
+				else if ( data_axi_pulse && decrypt_ok ) begin //get the next info (in order: address, length, then data)
 				
 					state_next_s = READ_RX;
 				
@@ -223,7 +229,9 @@ module fsm_mem_ctrl(
 
 			READ_RX: begin
 			
-				if (  ) begin //go back to check
+				if ( decrypt_ok && (data_cnt!=4) ) begin //go back to check
+				
+				    state_next_s = CHECK_RX;
 				
 				end
 				else if( decrypt_send && !decrypt_get ) begin //decide betwwen send and get (send)
@@ -236,27 +244,78 @@ module fsm_mem_ctrl(
 					state_next_s = GET_DATA_FROM_MEM;
 				
 				end
-			
+				else begin
+				    
+				    state_next_s = READ_RX;
+			     
+			     end
 			end
 			
 			SEND_DATA_TO_MEM: begin
 			
+			     if ( decrypt_data ) begin //if we send data
+			         
+			         request_type_mem_o = 1;
+			         data_out_mem_o = gen_reg;
+			         addr_mem_o = addr_s;
+			         state_next_s = IDLE;
+			     
+			     end
+			     else if ( decrypt_instr ) begin //if we send instructions
 			
+			         request_type_mem_o = 2;
+			         data_out_mem_o = gen_reg;
+			         addr_mem_o = addr_s;
+			         state_next_s = IDLE;			
+			
+			     end
+			     else begin
+			         
+			         state_next_s = SEND_DATA_TO_MEM;
+			     
+			     end
 			end
 
 			GET_DATA_FROM_MEM: begin
 			
-			
+			     addr_mem_o = addr_s;
+			     request_type_mem_o = 3;
+			     
+			     if ( mem_ready ) begin
+			     
+			         state_next_s = SEND_TX;
+			     
+			     end
+			     else begin
+			     
+			         state_next_s = GET_DATA_FROM_MEM;
+			         
+			     end
 			end
 
-			SEND_TX: begin 
+			SEND_TX: begin //TODO: think about somehow memorizing the data to be sent to axi (before WR_DATA we have WR_ADDR)
 			
+			     request_axi_type_o = 4;
+			     data_out_axi_o = gen_reg;
+			     state_next_s = CHECK_TX;
 			
 			end
 
 			CHECK_TX: begin
 			
-			
+			     request_axi_type_o = 3;
+			     
+			     if(!tx_full) begin
+			     
+			         state_next_s = GET_DATA_FROM_MEM;
+			     
+			     end
+			     
+			     else begin
+			     
+			         state_next_s = GET_DATA_FROM_MEM;
+			     
+			     end
 			end			
 		
 			default: begin
@@ -270,6 +329,5 @@ module fsm_mem_ctrl(
 		end
 
 endmodule
-
 
 
