@@ -17,7 +17,7 @@ module data_mem (
 
 
 
-	logic [ `MEM_SIZE :0 ] gen_data[0:`D_BITS-1]; //declaration of the register array
+	logic [ `D_BITS-1 : 0 ] gen_data[ 0 : `MEM_SIZE ]; //declaration of the register array
 
 
 	always_comb  begin
