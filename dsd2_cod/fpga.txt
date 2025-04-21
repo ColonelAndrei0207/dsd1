@@ -8,11 +8,13 @@ it contains the UART driver, memory controller, memory and RISC core,
 
 module fpga(
 	
+	//USED ONLY IN ECLIPSE
+	//signals from the UART driver
+	axi_lite_interface.slave axi_if
 	
 	
 	);
 	
-	axi_lite_interface axi_if;
 	
 //UART Driver SLAVE
 
@@ -21,6 +23,26 @@ module fpga(
 mem_ctrl ctrl(
 	
 	.axi_if(axi_if.master)
+	
+	);
+
+
+//TODO: when connecting the memories with the RISC core and the mem_ctrl, add MUXs to ensure that the data_mem can communicate properly with either ctrl or RISC, based on the command
+
+//instruction memory
+program_mem instr_mem (
+	
+	
+	);
+
+//data mem
+data_mem data_mem(
+	
+	
+	);
+	
+processor RISC_core (
+	
 	
 	);
 
