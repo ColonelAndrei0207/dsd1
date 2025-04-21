@@ -61,6 +61,23 @@ module fsm_mem_ctrl(
 	logic tx_full;
 
 
+	//always_comb block that decrypts the command received from the UART driver; based on the command, we can direct the FSM to it's proper state
+	always_comb begin
+
+		decrypt_ok = 0;
+		decrypt_error = 0;
+		decrypt_send = 0;
+		decrypt_get = 0;
+		decrypt_data = 0;
+		decrypt_instr = 0;
+		tx_full = 0;		
+
+		if() begin
+
+		end
+		else 
+	end
+
 	enum logic [ 2 : 0 ] {
 	
 		//reset state
