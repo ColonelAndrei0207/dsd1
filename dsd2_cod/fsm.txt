@@ -61,22 +61,6 @@ module fsm_mem_ctrl(
 	logic tx_full;
 
 
-	//always_comb block that decrypts the command received from the UART driver; based on the command, we can direct the FSM to it's proper state
-	always_comb begin
-
-		decrypt_ok = 0;
-		decrypt_error = 0;
-		decrypt_send = 0;
-		decrypt_get = 0;
-		decrypt_data = 0;
-		decrypt_instr = 0;
-		tx_full = 0;		
-
-		if() begin
-
-		end
-		else 
-	end
 
 	enum logic [ 2 : 0 ] {
 	
@@ -107,7 +91,26 @@ module fsm_mem_ctrl(
 		
 	} state_s, state_next_s;
 	
-	
+
+	//always_comb block that decrypts the command received from the UART driver; based on the command, we can direct the FSM to it's proper state
+	always_comb begin
+
+		decrypt_ok = 0;
+		decrypt_error = 0;
+		decrypt_send = 0;
+		decrypt_get = 0;
+		decrypt_data = 0;
+		decrypt_instr = 0;
+		tx_full = 0;		
+/*
+		if() begin
+
+		end
+		else 
+*/
+	end
+
+
 	//timer implementation
 	always_ff @ (posedge sys_clk_i, negedge sys_reset_n_i) begin
 	
@@ -201,7 +204,7 @@ module fsm_mem_ctrl(
 					request_axi_type_o = 1;
 				
 				end
-				else begin
+				else begin //TODO: add the transition from IDLE to CHECK_TX
 				
 					state_next_s = IDLE;
 					
@@ -268,7 +271,7 @@ module fsm_mem_ctrl(
 			     end
 			end
 			
-			SEND_DATA_TO_MEM: begin
+			SEND_DATA_TO_MEM: begin //TODO: add a condition / flag to ensure that we remain in the given command received from PC (when we go back into IDLE)
 			
 			     if ( decrypt_data ) begin //if we send data
 			         
@@ -293,7 +296,7 @@ module fsm_mem_ctrl(
 			     end
 			end
 
-			GET_DATA_FROM_MEM: begin
+			GET_DATA_FROM_MEM: begin //TODO: same as with SEND_DATA_TO_MEM
 			
 			     addr_mem_o = addr_s;
 			     request_type_mem_o = 3;
@@ -346,5 +349,4 @@ module fsm_mem_ctrl(
 		end
 
 endmodule
-
 
