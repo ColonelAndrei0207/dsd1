@@ -1,0 +1,19 @@
+Prioritatea nr 1: de rezolvat mem_ctrl;
+	GENERAL: pentru comenzi si toate cele sa adaug ori define ori parte din package (ma incurc la comenzi)	
+		 de gasit o conventie pentru request_type_axi; a.i. sa se stie ce anume s-a cerut, ce anume primeste fsm-ul
+		 de rezolvat TODO-urile
+fsm:
+	
+	de facut bloc decrypt;
+	de facut bloc de incrementare a adresei pentru i_o_mem;
+	de implementat flag-uri a.i. sa se stie cand sa se trimita date catre i_o_axi sau i_o_mem
+	
+i_o_mem:
+	momentan nimic (vezi GENERAL)
+		
+
+i_o_axi:
+	momentan nimic (vezi GENERAL)
+
+mem_ctrl:
+	conectare module intre ele si i_o_mem cu exteriorul
