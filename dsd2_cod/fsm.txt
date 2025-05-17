@@ -110,8 +110,22 @@ module fsm_mem_ctrl(
 */
 	end
 
+    //always block that increments the address when writing into memory
+    always_ff @(posedge sys_clk_i, negedge sys_reset_n_i) begin
+		if (!sys_reset_n_i) begin
+		
+		  addr_s <= 0;
+		
+		end
+		else begin //add condition so that it only increments when nedeed (condition will always be slower than clk)
+		
+		  addr_s <= addr_s + 1;
+		
+		end       
+    end
 
-	//timer implementation
+	//timer implementation for power reduction
+	//TODO: add flags to ensure proper FSM transitions
 	always_ff @ (posedge sys_clk_i, negedge sys_reset_n_i) begin
 	
 		if (!sys_reset_n_i) begin
@@ -349,4 +363,3 @@ module fsm_mem_ctrl(
 		end
 
 endmodule
-
