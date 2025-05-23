@@ -4,6 +4,8 @@
   *
   *******************************************************************************/
 
+
+
 //1. MAIN PARAMETERS
 
  `define A_BITS 10 //data bus size
@@ -16,6 +18,35 @@
  `define UART_PAYLOAD 8
  `define AXI_REQ_NR 3
  `define MEM_REQ_NR 2
+ 
+   //mem_ctrl defines that i will use 
+ 
+  //i_o_axi commands
+  `define AXI_RX_READ `AXI_REQ_NR-1'd2
+  `define AXI_TX_CHECK `AXI_REQ_NR-1'd3
+  `define AXI_RX_CHECK `AXI_REQ_NR-1'd1
+  `define AXI_TX_WRITE `AXI_REQ_NR-1'd4
+  `define AXI_STATUS_ADDR 8'h08
+  `define AXI_RX_FIFO_ADDR 8'h00
+  `define AXI_TX_FIFO_ADDR 8'h04
+ 
+ 
+ //i_o_mem commands
+  `define MEM_DATA_READ `MEM_REQ_NR-1'd3
+  `define MEM_DATA_WRITE `MEM_REQ_NR-1'd1
+  `define MEM_INST_WRITE `MEM_REQ_NR-1'd2  
+ 
+  
+//UART commands (the ones that say what we want to do
+
+  `define RESET_RISC `UART_PAYLOAD-1'd1
+  `define HALT_RISC `UART_PAYLOAD-1'd2
+  `define START_RISC `UART_PAYLOAD-1'd3
+  `define DATA_WRITE `UART_PAYLOAD-1'd4
+  `define INST_READ `UART_PAYLOAD-1'd5
+  `define DATA_READ `UART_PAYLOAD-1'd6
+
+
  
  `define MEM_SIZE (1<<((`A_SIZE)-2))
  
