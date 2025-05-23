@@ -1,7 +1,8 @@
 Prioritatea nr 1: de rezolvat mem_ctrl;
-	GENERAL: pentru comenzi si toate cele sa adaug ori define ori parte din package (ma incurc la comenzi)	
-		 de gasit o conventie pentru request_type_axi; a.i. sa se stie ce anume s-a cerut, ce anume primeste fsm-ul
-		 de rezolvat TODO-urile
+GENERAL: pentru comenzi si toate cele sa adaug ori define ori parte din package (ma incurc la comenzi)	
+	 DONE: de gasit o conventie pentru request_type_axi; a.i. sa se stie ce anume s-a cerut, ce anume primeste fsm-ul
+	 de rezolvat TODO-urile
+
 fsm:
 	
 	de facut bloc decrypt;
