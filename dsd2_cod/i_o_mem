@@ -24,7 +24,6 @@ module i_o_mem(
 		input logic [`MEM_REQ_NR-1:0] command_i,
 
 		output logic [`D_BITS-1:0] data_ctrl_o,
-//      output logic [`A_BITS-1:0] address_ctrl_o,
 		output logic data_sent,
 
 		//link with the data memory
@@ -81,22 +80,21 @@ module i_o_mem(
 		end
 		else begin
 
-			if(command_i == 1) begin
+			data_addr_out_o <= address_out_s; //pulled out of the if case because the address is sent anyway
+
+			if(command_i == `MEM_DATA_WRITE) begin //if we do a data WRITE
 
 				data_we <= 1;
 				data_out_o <= data_in_i;
-				data_addr_out_o <= address_out_s;
-
+				
 			end
 			else begin
 				data_we <=0;
 
-
-					if(command_i == 3) begin
+					if(command_i == `MEM_DATA_READ) begin //else if we do a data READ
 
 						data_sent <= 1;
 						data_ctrl_o <= data_mem_in_i;
-
 
 				end
 			end
@@ -115,7 +113,7 @@ module i_o_mem(
 		end
 		else begin
 
-			if(command_i == 2) begin
+			if(command_i == `MEM_INST_WRITE) begin //if we want an instruction WRITE
 
 				instr_we <= 1;
 				instr_out_o <= data_in_i[`A_SIZE-1:0];
@@ -133,3 +131,4 @@ module i_o_mem(
 
 
 endmodule
+
