@@ -59,8 +59,11 @@ module fsm_mem_ctrl(
 	logic decrypt_get_s;
 	logic decrypt_data_s;
 	logic decrypt_instr_s;
-	
-	
+	logic decrypt_reset_s;
+	logic decrypt_halt_s;
+	logic decrypt_start_s;
+
+
 	logic tx_full_s;
 
 	logic command_received_s; //flag used to ensure that during read/write of data/inst we do not go back into the DECRYPT state
@@ -98,7 +101,8 @@ module fsm_mem_ctrl(
 	} state_s, state_next_s;
 
 
-	//always_comb block that decrypts the command received from the UART driver; based on the command, we can direct the FSM to it's proper state
+	//always_ff block that decrypts the command received from the UART driver; based on the command, we can direct the FSM to it's proper state
+	//chosen the use of flip-flops to ensure that the flags remain set (will help during the FSM transitions)
 	always_ff @( posedge sys_clk_i, negedge sys_reset_n_i ) begin
 
 		if(!sys_reset_n_i) begin
@@ -109,7 +113,10 @@ module fsm_mem_ctrl(
 			decrypt_get_s <= 0;
 			decrypt_data_s <= 0;
 			decrypt_instr_s <= 0;
-			
+			decrypt_reset_s <= 0;
+			decrypt_halt_s <= 0;
+			decrypt_start_s <= 0;
+
 
 		end
 		else begin
@@ -118,40 +125,76 @@ module fsm_mem_ctrl(
 
 				case(gen_reg[`UART_PAYLOAD-1:0])
 
-			  		`RESET_RISC: begin //set a flag to reset the risc
-				  		
-			  		end
-			  		
-			  		`HALT_RISC: begin //send HALT instruction to risc
-				  		
-  					end
-  					
-  					`START_RISC: begin //soft reset to the risc
-	  					
-  					end
-  					
-  					`DATA_WRITE: begin //prepare to write into data
-	  					
-  					end
-  					
-  					`INST_READ: begin //preapre to write into instruction
-  					
-  					end
-  					
-  					`DATA_READ: begin //prepare to read data
-	  					
-  					end
-  					
+					`RESET_RISC: begin //set a flag to reset the risc
 
+						decrypt_reset_s <= 1;
+
+					end
+
+					`HALT_RISC: begin //send HALT instruction to risc
+
+						decrypt_halt_s <= 1;
+
+					end
+
+					`START_RISC: begin //soft reset to the risc
+
+						decrypt_start_s <= 1;
+
+					end
+
+					`DATA_WRITE: begin //prepare to write into data
+
+						decrypt_data_s <= 1;
+						decrypt_ok_s <= 1;
+						decrypt_send_s <= 1;
+
+					end
+
+					`INST_WRITE: begin //preapre to write into instruction
+
+						decrypt_instr_s <= 1;
+						decrypt_ok_s <= 1;
+						decrypt_send_s <= 1;
+
+					end
+
+					`DATA_READ: begin //prepare to read data
+
+						decrypt_get_s <= 1;
+						decrypt_ok_s <= 1;
+
+					end
+
+					default: begin //if the command received is improper, keep the flags on 0 and set decrypt_error_s on 1
+
+						decrypt_error_s <= 1;
+						decrypt_ok_s <= 0;
+						decrypt_send_s <= 0;
+						decrypt_get_s <= 0;
+						decrypt_data_s <= 0;
+						decrypt_instr_s <= 0;
+						decrypt_reset_s <= 0;
+						decrypt_halt_s <= 0;
+						decrypt_start_s <= 0;
+
+					end
 				endcase
 
 			end
-			else begin //else, if the command has not been received, wait and do nothing
+			else begin //else, if the command has not been received or command received has been processed, set all flags on 0
 
-				
+				decrypt_error_s <= 0;
+				decrypt_ok_s <= 0;
+				decrypt_send_s <= 0;
+				decrypt_get_s <= 0;
+				decrypt_data_s <= 0;
+				decrypt_instr_s <= 0;
+				decrypt_reset_s <= 0;
+				decrypt_halt_s <= 0;
+				decrypt_start_s <= 0;
 
 			end
-
 		end
 	end
 
@@ -170,7 +213,7 @@ module fsm_mem_ctrl(
 
 			end
 			else if( cnt_received_s & //when the cnt has been received
-				(idle_tmr_s == timer_value) ) begin   //when we send to the driver a command, waiting to get data
+					(idle_tmr_s == timer_value) ) begin   //when we send to the driver a command, waiting to get data
 
 				addr_s <= addr_s + 1;
 
@@ -231,7 +274,7 @@ module fsm_mem_ctrl(
 	end
 
 
-	//generating the FSM transitions
+	//generating the FSM transitions + sorting out the command_received_s flag
 	always_ff @ (posedge sys_clk_i , negedge sys_reset_n_i) begin
 
 		if(sys_reset_n_i) begin
@@ -249,7 +292,8 @@ module fsm_mem_ctrl(
 				command_received_s <=1;
 
 			end
-			else if ( (cnt_ctrl_s == cnt_received_s) && ( cnt_received_s!=0 ) ) begin //we reset the flag when the counter for the number of data/instruction to read/write reaches it's max value, different from 0
+			else if ( (cnt_ctrl_s == cnt_received_s) && ( cnt_received_s!=0 ) ) begin 
+				//we reset the flag when the counter for the number of data/instruction to read/write reaches it's max value, different from 0(to ensure that we have actually received the counter)
 
 				command_received_s <=0;
 
