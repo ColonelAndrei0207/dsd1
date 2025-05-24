@@ -68,7 +68,7 @@ module fsm_mem_ctrl(
 
 	logic command_received_s; //flag used to ensure that during read/write of data/inst we do not go back into the DECRYPT state
 	logic addr_received_s;
-	logic cnt_received_s;
+	logic cnt_flag_received_s;
 
 
 	enum logic [ 2 : 0 ] {
@@ -212,10 +212,15 @@ module fsm_mem_ctrl(
 				addr_s <= gen_reg[`A_BITS-1 : 0];
 
 			end
-			else if( cnt_received_s & //when the cnt has been received
+			else if( cnt_flag_received_s & //when the cnt has been received
 					(idle_tmr_s == timer_value) ) begin   //when we send to the driver a command, waiting to get data
 
 				addr_s <= addr_s + 1;
+
+			end
+			else begin
+
+				addr_s <= addr_s;
 
 			end
 		end
@@ -251,14 +256,39 @@ module fsm_mem_ctrl(
 		if(!sys_reset_n_i) begin
 
 			gen_reg <=0;
+			addr_received_s <= 0;
+			cnt_flag_received_s <= 0;
 
 		end
-		else begin
+		else begin //TODO:find a way to safely load up the address (considering that it takes up 2 bytes of data)
+//                  TODO: inside either the fsm or on i_o_axi find a way to ensure that 32 bits of data are received from the i_o_axi or the 16 bits for inst
 
-			if(data_axi_pulse_i) begin
+			if(data_axi_pulse_i) begin //TODO: add extra conditions so that I can make sure that I load up the gen_reg with the address or the counter
 
-				gen_reg <= data_in_axi_i;
+				if(command_received_s) begin
 
+					gen_reg[`UART_PAYLOAD-1:0] <= data_in_axi_i[`UART_PAYLOAD-1:0]; //gets the command so that we can proccess it in the decryption block
+
+					if(decrypt_ok_s) begin //we should expect the addr to be received
+
+						addr_received_s <=1;
+						gen_reg[`A_BITS-1 : 0] <= data_in_axi_i[`A_BITS-1 : 0];
+
+						if (addr_received_s) begin //we expect the counter to be received
+
+							cnt_flag_received_s <=1;
+							gen_reg[`UART_PAYLOAD-1:0] <= data_in_axi_i[`UART_PAYLOAD-1:0];
+
+							if (cnt_received_s != cnt_ctrl_s) begin //we expect data to arrive
+
+								gen_reg <= data_in_axi_i;
+
+							end
+
+						end
+
+					end
+				end
 			end
 			else if(mem_ready_i) begin
 
@@ -274,10 +304,33 @@ module fsm_mem_ctrl(
 	end
 
 
+	always_ff @ (posedge sys_clk_i , negedge sys_reset_n_i) begin
+
+		if(!sys_reset_n_i) begin
+
+			cnt_ctrl_s <=0;
+
+		end
+		else begin
+
+			if ( cnt_flag_received_s & data_axi_pulse_i ) begin //if we received the counter value from axi, we start to count each data received
+
+				cnt_ctrl_s<= cnt_ctrl_s+1;
+
+			end
+			else if(cnt_received_s == cnt_ctrl_s) begin
+
+				cnt_ctrl_s <= 0;
+
+			end
+		end
+	end
+
+
 	//generating the FSM transitions + sorting out the command_received_s flag
 	always_ff @ (posedge sys_clk_i , negedge sys_reset_n_i) begin
 
-		if(sys_reset_n_i) begin
+		if(!sys_reset_n_i) begin
 
 			state_s <= IDLE;
 			command_received_s <= 0;
@@ -292,7 +345,7 @@ module fsm_mem_ctrl(
 				command_received_s <=1;
 
 			end
-			else if ( (cnt_ctrl_s == cnt_received_s) && ( cnt_received_s!=0 ) ) begin 
+			else if ( (cnt_ctrl_s == cnt_received_s) && ( cnt_received_s!=0 ) ) begin
 				//we reset the flag when the counter for the number of data/instruction to read/write reaches it's max value, different from 0(to ensure that we have actually received the counter)
 
 				command_received_s <=0;
