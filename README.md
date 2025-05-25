@@ -1,6 +1,8 @@
 # dsd1
 dsd1 project files
 
+notite actualizate: de facut frumos acest repo!!!!
+
 Notite partea a doua;
   Am finalizat stagiul f_execute, cu cele 4 registre de procesare
   Ar trebui sa fac modificari pentru primirea datelor de la READ
