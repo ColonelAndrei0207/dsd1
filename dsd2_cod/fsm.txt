@@ -44,7 +44,7 @@ module fsm_mem_ctrl(
 	logic [`UART_PAYLOAD - 1: 0] cnt_received_s; //value received from the driver, representing the length in the command
 
 
-	logic [1:0] data_cnt; //mini-counter used to ensure that we fill-up the gen_reg with 32 bit data
+	logic [1:0] data_cnt; //mini-counter used to ensure that we fill-up the gen_reg with 32 bit data TODO: maybe modify the counter so that it waits more from the i_o_axi
 
 	//general register that stores the information received either from the memory or the driver
 	logic [ `D_BITS-1 : 0 ] gen_reg;
@@ -69,6 +69,7 @@ module fsm_mem_ctrl(
 	logic command_received_s; //flag used to ensure that during read/write of data/inst we do not go back into the DECRYPT state
 	logic addr_received_s;
 	logic cnt_flag_received_s;
+	//logic cnt_value_received_s;
 
 
 	enum logic [ 2 : 0 ] {
@@ -212,8 +213,7 @@ module fsm_mem_ctrl(
 				addr_s <= gen_reg[`A_BITS-1 : 0];
 
 			end
-			else if( cnt_flag_received_s & //when the cnt has been received
-					(idle_tmr_s == timer_value) ) begin   //when we send to the driver a command, waiting to get data
+			else if ( (state_s == SEND_DATA_TO_MEM) || (state_s == GET_DATA_FROM_MEM) )  begin   //when we send to the driver a command, waiting to get data
 
 				addr_s <= addr_s + 1;
 
@@ -265,29 +265,36 @@ module fsm_mem_ctrl(
 
 			if(data_axi_pulse_i) begin //TODO: add extra conditions so that I can make sure that I load up the gen_reg with the address or the counter
 
-				if(command_received_s) begin
+				if(command_received_s && !decrypt_ok_s) begin
 
 					gen_reg[`UART_PAYLOAD-1:0] <= data_in_axi_i[`UART_PAYLOAD-1:0]; //gets the command so that we can proccess it in the decryption block
 
-					if(decrypt_ok_s) begin //we should expect the addr to be received
+				end
+				else if(decrypt_ok_s  && !addr_received_s) begin //we should expect the addr to be received
 
-						addr_received_s <=1;
-						gen_reg[`A_BITS-1 : 0] <= data_in_axi_i[`A_BITS-1 : 0];
+					addr_received_s <=1;
+					gen_reg[`A_BITS-1 : 0] <= data_in_axi_i[`A_BITS-1 : 0];
 
-						if (addr_received_s) begin //we expect the counter to be received
+				end
+				else if (!cnt_flag_received_s) begin //we expect the counter to be received
 
-							cnt_flag_received_s <=1;
-							gen_reg[`UART_PAYLOAD-1:0] <= data_in_axi_i[`UART_PAYLOAD-1:0];
+					addr_received_s <=0;
+					cnt_flag_received_s <=1;
+					gen_reg[`UART_PAYLOAD-1:0] <= data_in_axi_i[`UART_PAYLOAD-1:0];
 
-							if (cnt_received_s != cnt_ctrl_s) begin //we expect data to arrive
+				end
 
-								gen_reg <= data_in_axi_i;
+				else if ( (cnt_received_s != cnt_ctrl_s) && cnt_flag_received_s ) begin //we expect data to arrive
 
-							end
+					cnt_flag_received_s <=0;
+					gen_reg <= data_in_axi_i;
 
-						end
+				end
+				else begin //when the counter has finished we can reset all the flags
 
-					end
+					cnt_flag_received_s <= 0;
+					addr_received_s <= 0;
+
 				end
 			end
 			else if(mem_ready_i) begin
@@ -308,12 +315,19 @@ module fsm_mem_ctrl(
 
 		if(!sys_reset_n_i) begin
 
-			cnt_ctrl_s <=0;
+			cnt_ctrl_s <= 0;
+			cnt_received_s <= 0;
 
 		end
 		else begin
+			if( cnt_flag_received_s ) begin //this is when we know that the counter value will be received
 
-			if ( cnt_flag_received_s & data_axi_pulse_i ) begin //if we received the counter value from axi, we start to count each data received
+				cnt_received_s <= gen_reg[`UART_PAYLOAD-1:0];
+
+
+			end
+
+			else if ( data_axi_pulse_i ) begin //if we received the counter value from axi, we start to count each data received
 
 				cnt_ctrl_s<= cnt_ctrl_s+1;
 
@@ -327,7 +341,7 @@ module fsm_mem_ctrl(
 	end
 
 
-	//generating the FSM transitions + sorting out the command_received_s flag
+//generating the FSM transitions + sorting out the command_received_s flag
 	always_ff @ (posedge sys_clk_i , negedge sys_reset_n_i) begin
 
 		if(!sys_reset_n_i) begin
@@ -354,7 +368,7 @@ module fsm_mem_ctrl(
 		end
 	end
 
-	//fsm transitions
+//fsm transitions
 	always_comb begin
 
 		state_next_s = state_s;
@@ -450,26 +464,33 @@ module fsm_mem_ctrl(
 
 				SEND_DATA_TO_MEM: begin //TODO: add a condition / flag to ensure that we remain in the given command received from PC (when we go back into IDLE)
 
-					if ( decrypt_data_s ) begin //if we send data
+					if( cnt_received_s == cnt_ctrl_s ) begin
 
-						request_type_mem_o = `MEM_DATA_WRITE;
-						data_out_mem_o = gen_reg;
-						addr_mem_o = addr_s;
 						state_next_s = IDLE;
-
-					end
-					else if ( decrypt_instr_s ) begin //if we send instructions
-
-						request_type_mem_o = `MEM_INST_WRITE;
-						data_out_mem_o = gen_reg;
-						addr_mem_o = addr_s;
-						state_next_s = IDLE;
-
 					end
 					else begin
 
-						state_next_s = SEND_DATA_TO_MEM;
+						if ( decrypt_data_s ) begin //if we send data
 
+							request_type_mem_o = `MEM_DATA_WRITE;
+							data_out_mem_o = gen_reg;
+							addr_mem_o = addr_s;
+							state_next_s = IDLE;
+
+						end
+						else if ( decrypt_instr_s ) begin //if we send instructions
+
+							request_type_mem_o = `MEM_INST_WRITE;
+							data_out_mem_o = gen_reg;
+							addr_mem_o = addr_s;
+							state_next_s = IDLE;
+
+						end
+						else begin
+
+							state_next_s = SEND_DATA_TO_MEM;
+
+						end
 					end
 				end
 
