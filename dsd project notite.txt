@@ -1,3 +1,6 @@
+Modificari necesare la loading gen_reg (nu ma pot baza pe ideea de a avea in if semnale generate tot in acel bloc;
+	Eventual sa le mut in always_ff al fsm-ului, pare mai rezonabil acolo, avand deja command_received_s, mai ales ca se leaga, intr-un fel si de starile fsm-ului, eventual de bagat un mini-counter, a.i. sa se stie ca la READ_RX se parcurg elementele cerute
+
 De vazut daca e corect cum se incarca addr_received, cnt_received + incrementarea;
 de reverificat tranzitiile fsm a.i. sa ma asigur ca se citeste si se trimite corespunzator data din si catre memorie;
 de implementat verificarile pentru check_rx si check_tx (poate in fsm, poate in i_o_axi, de vazut)
