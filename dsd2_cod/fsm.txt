@@ -37,7 +37,9 @@ module fsm_mem_ctrl(
 
 	);
 
-	localparam timer_value = 100; //used now for testing
+	localparam timer_value = 79; //used now for testing
+	localparam timer_value_2_bytes = 2*timer_value; //used now for testing
+	localparam timer_value_4_bytes = 4*timer_value; //used now for testing
 
 	logic [ $clog2(timer_value) : 0 ] idle_tmr_s;
 	logic [`UART_PAYLOAD - 1: 0] cnt_ctrl_s; //counter of the internal mem_ctrl
@@ -103,6 +105,34 @@ module fsm_mem_ctrl(
 	} state_s, state_next_s;
 
 
+	//timer implementation for power reduction
+	//TODO: add specific limits also for addr/instr (2bytes to receive) and data (4bytes to receive)
+	always_ff @ (posedge sys_clk_i, negedge sys_reset_n_i) begin
+
+		if (!sys_reset_n_i) begin
+
+			idle_tmr_s <= 0;
+
+		end
+		else begin
+            
+            
+                        
+			if(idle_tmr_s == timer_value) begin
+
+				idle_tmr_s <= 0;
+
+			end else begin
+
+				idle_tmr_s <= idle_tmr_s+1;
+
+			end
+			
+
+		end
+
+	end
+
 	//always_ff block that decrypts the command received from the UART driver; based on the command, we can direct the FSM to it's proper state
 	//chosen the use of flip-flops to ensure that the flags remain set (will help during the FSM transitions)
 	always_ff @( posedge sys_clk_i, negedge sys_reset_n_i ) begin
@@ -121,10 +151,10 @@ module fsm_mem_ctrl(
 
 
 		end
-		else begin
+		else begin//TODO: think how to reset the flags when we get start/stop/halt
 
 			if (command_received_s) begin //if the command is received from the driver, start the decrypt, to set the flags
-
+    
 				case(gen_reg[`UART_PAYLOAD-1:0])
 
 					`RESET_RISC: begin //set a flag to reset the risc
@@ -230,30 +260,6 @@ module fsm_mem_ctrl(
 
 			end
 		end
-	end
-
-	//timer implementation for power reduction
-	//TODO: add flags to ensure proper FSM transitions
-	always_ff @ (posedge sys_clk_i, negedge sys_reset_n_i) begin
-
-		if (!sys_reset_n_i) begin
-
-			idle_tmr_s <= 0;
-
-		end
-		else begin
-
-			if(idle_tmr_s == timer_value) begin
-
-				idle_tmr_s <= 0;
-
-			end else begin
-
-				idle_tmr_s <= idle_tmr_s+1;
-
-			end
-		end
-
 	end
 
 	//loading data into the gen_reg
@@ -504,10 +510,11 @@ module fsm_mem_ctrl(
 						end
 						else begin
 
-							state_next_s = CHECK_RX;
+							state_next_s = IDLE;
 
 						end
 					end
+
 				end
 
 				DECRYPT: begin
