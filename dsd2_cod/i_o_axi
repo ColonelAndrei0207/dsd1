@@ -46,26 +46,6 @@ module i_o_axi(
 	} state_s, state_next_s;
 
 
-	//timer used only when data is requested from the driver, made to ensure that addr and instr are received properly (in 2 "transactions" and data in 4)
-	always_ff @ (posedge axi_if.a_clk , negedge axi_if.a_reset_n) begin //TODO: add modifications
-
-		if( !axi_if.a_reset_n ) begin
-
-			
-
-		end
-		else begin
-
-			if( request_type_i == `AXI_RX_READ ) begin
-
-				
-
-			end
-		end
-	end
-
-
-
 	always_ff @ (posedge axi_if.a_clk , negedge axi_if.a_reset_n) begin
 
 		if(!axi_if.a_reset_n) begin
@@ -119,7 +99,7 @@ module i_o_axi(
 				end
 			end
 
-			RD_ADDR: begin
+			RD_ADDR: begin //TODO: modify based on request_type received form fsm
 
 				if ( request_type_i == `AXI_RX_CHECK ) begin //if we want to check Rx FIFO status
 
@@ -246,5 +226,3 @@ module i_o_axi(
 
 
 endmodule
-
-
