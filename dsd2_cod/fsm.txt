@@ -63,6 +63,7 @@ module fsm_mem_ctrl(
 	logic decrypt_halt_s;
 	logic decrypt_start_s;
 
+	logic [1:0] command_order_cnt_s;
 
 	logic tx_full_s;
 
@@ -218,6 +219,11 @@ module fsm_mem_ctrl(
 				addr_s <= addr_s + 1;
 
 			end
+			else if ( cnt_received_s == cnt_ctrl_s ) begin
+
+				addr_s <= 0;
+
+			end
 			else begin
 
 				addr_s <= addr_s;
@@ -260,7 +266,7 @@ module fsm_mem_ctrl(
 			cnt_flag_received_s <= 0;
 
 		end
-		else begin //TODO:find a way to safely load up the address (considering that it takes up 2 bytes of data)
+		else begin //TODO:find a way to safely load up the address (considering that it takes up 2 bytes of data) ->will do in i_o_axi
 //                  TODO: inside either the fsm or on i_o_axi find a way to ensure that 32 bits of data are received from the i_o_axi or the 16 bits for inst
 
 			if(data_axi_pulse_i) begin //TODO: add extra conditions so that I can make sure that I load up the gen_reg with the address or the counter
@@ -270,13 +276,13 @@ module fsm_mem_ctrl(
 					gen_reg[`UART_PAYLOAD-1:0] <= data_in_axi_i[`UART_PAYLOAD-1:0]; //gets the command so that we can proccess it in the decryption block
 
 				end
-				else if(decrypt_ok_s  && !addr_received_s) begin //we should expect the addr to be received
+				else if(decrypt_ok_s  && (command_order_cnt_s == 1 )) begin //we should expect the addr to be received
 
 					addr_received_s <=1;
 					gen_reg[`A_BITS-1 : 0] <= data_in_axi_i[`A_BITS-1 : 0];
 
 				end
-				else if (!cnt_flag_received_s) begin //we expect the counter to be received
+				else if (decrypt_ok_s && (command_order_cnt_s == 2 )  ) begin //we expect the counter to be received
 
 					addr_received_s <=0;
 					cnt_flag_received_s <=1;
@@ -284,7 +290,7 @@ module fsm_mem_ctrl(
 
 				end
 
-				else if ( (cnt_received_s != cnt_ctrl_s) && cnt_flag_received_s ) begin //we expect data to arrive
+				else if ( (cnt_received_s != cnt_ctrl_s) && (command_order_cnt_s > 2 ) ) begin //we expect data to arrive
 
 					cnt_flag_received_s <=0;
 					gen_reg <= data_in_axi_i;
@@ -348,11 +354,50 @@ module fsm_mem_ctrl(
 
 			state_s <= IDLE;
 			command_received_s <= 0;
+			tx_full_s <= 0;
+			command_order_cnt_s <= 0;
 
 		end
 		else begin
 
 			state_s <= state_next_s;
+
+			if( ( state_s == CHECK_TX) && ( state_next_s == IDLE ) ) begin
+
+				tx_full_s <= 1;
+
+			end
+			else begin
+
+				tx_full_s <= 0;
+
+			end
+
+			//incrementing the mini-counter that states how we get the data
+			if( (state_s == IDLE) && !decrypt_ok_s ) begin
+//when the mem_ctrl starts up, we want to have the cnt reset,
+//decrypt_ok_s signal gets the value of 1 only when it has gone through the decrypt stage,
+//after that it only enters this condition when the command received has been fully processed
+
+				command_order_cnt_s <=0;
+
+			end
+			else if(state_s == DECRYPT ) begin
+
+				command_order_cnt_s <=1;
+
+			end
+			else if ( (state_s == READ_RX) && (command_order_cnt_s != 4) ) begin
+
+				command_order_cnt_s <= command_order_cnt_s +1;
+
+			end
+			else begin //if we are in another state and the cnt is 4, we keep the cnt's value
+
+				command_order_cnt_s <= command_order_cnt_s;
+
+			end
+
 
 			if(state_next_s == DECRYPT) begin
 
@@ -390,8 +435,16 @@ module fsm_mem_ctrl(
 
 					if(idle_tmr_s == timer_value) begin //TODO: add extra flags to ensure that we actually go into check rx and not into check tx
 
-						state_next_s = CHECK_RX;
-						request_axi_type_o = `AXI_RX_CHECK;
+						if(tx_full_s) begin //if we have tx fifo is full, and the timer ended, we will go back into check_tx, to ensure that we can continue to send data
+
+							state_next_s = CHECK_TX;
+							request_axi_type_o = `AXI_TX_CHECK;
+
+						end
+						else begin
+							state_next_s = CHECK_RX;
+							request_axi_type_o = `AXI_RX_CHECK;
+						end
 
 					end
 					else begin //TODO: add the transition from IDLE to CHECK_TX
@@ -402,102 +455,146 @@ module fsm_mem_ctrl(
 
 				end
 
+
 				CHECK_RX: begin
 
-					if( data_axi_pulse_i  && !decrypt_ok_s ) begin //decrypt is entered only on first data read from RX, in order to get the command
+					if (data_axi_pulse_i &&  !data_in_axi_i[0] ) begin //if the STAT_REG shows that Rx FIFO is empty, go back to IDLE
 
-						state_next_s = DECRYPT;
-
-
-					end
-					else if ( data_axi_pulse_i && decrypt_ok_s ) begin //get the next info (in order: address, length, then data)
-
-						state_next_s = READ_RX;
+						state_next_s = IDLE;
 
 					end
 					else begin
 
-						state_next_s = CHECK_RX;
+						if( data_axi_pulse_i  && !decrypt_ok_s ) begin //decrypt is entered only on first data read from RX, in order to get the command
 
+							state_next_s = DECRYPT;
+							request_axi_type_o = `AXI_RX_READ; //get the command
+
+
+						end
+						else if ( data_axi_pulse_i && decrypt_ok_s ) begin //get the next info (in order: address, length, then data)
+
+							state_next_s = READ_RX;
+
+							if( command_order_cnt_s == 2 ) begin //we will be receiving the address
+
+								request_axi_type_o = `AXI_RX_ADDR; //get the addr
+
+							end
+							else if( command_order_cnt_s == 3 ) begin //we will be receiving the length
+
+								request_axi_type_o = `AXI_RX_CNT; //get the cnt
+
+							end
+							else if( (command_order_cnt_s == 4) && decrypt_instr_s ) begin //from here we will receive the actual instruction
+
+								request_axi_type_o = `AXI_RX_INST; //get the instr
+
+							end
+							else if ( (command_order_cnt_s == 4) && decrypt_data_s ) begin //from here we will receive the actual data
+
+								request_axi_type_o = `AXI_RX_DATA; //get the data
+
+							end
+							else begin
+
+								request_axi_type_o = 0; //it's a problem in here
+
+							end
+						end
+						else begin
+
+							state_next_s = CHECK_RX;
+
+						end
 					end
 				end
 
 				DECRYPT: begin
 
-					if(decrypt_ok_s) begin
+					if(decrypt_ok_s) begin //this is to receive address and counter
 
-						state_next_s = READ_RX;
-						request_axi_type_o = `AXI_RX_READ;
+						state_next_s = CHECK_RX; //we go back into check rx so that we can get the next part of the command, having decrypted the command required
+					//request_axi_type_o = `AXI_RX_READ; //request to get
 
 					end
+
 					else begin
 
 						state_next_s = DECRYPT;
 
 					end
-
 				end
 
-				READ_RX: begin
+				READ_RX: begin //TODO: add conditions to make sure that we get out of READ_RX only when there is data to send (not only with the flags from decrypt, as they don't hold any other value)
 
-					if ( decrypt_ok_s && (data_cnt!=4) ) begin //go back to check
+					if( (command_order_cnt_s == 4)  ) begin //here we are ready to send or receive data
+						if( decrypt_send_s && !decrypt_get_s && data_axi_pulse_i) begin //if we need to send data, only do it when gen_reg is loaded
 
-						state_next_s = CHECK_RX;
+							if ( decrypt_data_s ) begin //if we send data TODO: add extra conditions to ensure that we have data to send
 
-					end
-					else if( decrypt_send_s && !decrypt_get_s ) begin //decide betwwen send and get (send)
+								request_type_mem_o = `MEM_DATA_WRITE;
+								data_out_mem_o = gen_reg;
+								addr_mem_o = addr_s;
+								state_next_s = SEND_DATA_TO_MEM;
 
-						state_next_s = SEND_DATA_TO_MEM;
+							end
+							else if ( decrypt_instr_s ) begin //if we send instructions
 
-					end
-					else if ( !decrypt_send_s && decrypt_get_s ) begin //(get)
+								request_type_mem_o = `MEM_INST_WRITE;
+								data_out_mem_o[`A_SIZE-1:0] = gen_reg[`A_SIZE-1:0]; //send only the 16-bit instruction
+								addr_mem_o = addr_s;
+								state_next_s = SEND_DATA_TO_MEM;
 
-						state_next_s = GET_DATA_FROM_MEM;
+							end
 
+						end
+						else if ( !decrypt_send_s && decrypt_get_s ) begin //(get)
+
+							addr_mem_o = addr_s;
+							request_type_mem_o = `MEM_DATA_READ;
+							state_next_s = GET_DATA_FROM_MEM;
+
+						end
+
+						else begin
+
+							state_next_s = READ_RX;
+
+						end
 					end
 					else begin
 
-						state_next_s = READ_RX;
 
 					end
+
 				end
 
 				SEND_DATA_TO_MEM: begin //TODO: add a condition / flag to ensure that we remain in the given command received from PC (when we go back into IDLE)
 
-					if( cnt_received_s == cnt_ctrl_s ) begin
+//                  if( cnt_received_s == cnt_ctrl_s ) begin
+
+//                      state_next_s = IDLE;
+
+//                  end
+//                  else begin
+
+					if ( mem_ready_i ) begin
 
 						state_next_s = IDLE;
+
 					end
 					else begin
 
-						if ( decrypt_data_s ) begin //if we send data
+						state_next_s = SEND_DATA_TO_MEM;
 
-							request_type_mem_o = `MEM_DATA_WRITE;
-							data_out_mem_o = gen_reg;
-							addr_mem_o = addr_s;
-							state_next_s = IDLE;
-
-						end
-						else if ( decrypt_instr_s ) begin //if we send instructions
-
-							request_type_mem_o = `MEM_INST_WRITE;
-							data_out_mem_o = gen_reg;
-							addr_mem_o = addr_s;
-							state_next_s = IDLE;
-
-						end
-						else begin
-
-							state_next_s = SEND_DATA_TO_MEM;
-
-						end
 					end
+//                  end
 				end
 
 				GET_DATA_FROM_MEM: begin //TODO: same as with SEND_DATA_TO_MEM
 
-					addr_mem_o = addr_s;
-					request_type_mem_o = `MEM_DATA_READ;
+
 
 					if ( mem_ready_i ) begin
 
@@ -519,19 +616,22 @@ module fsm_mem_ctrl(
 
 				end
 
-				CHECK_TX: begin
+				CHECK_TX: begin //TODO:
 
-					request_axi_type_o = `AXI_TX_CHECK;
+					if( data_axi_pulse_i && data_in_axi_i[3] ) begin //TX is full, go to idle
 
-					if(!tx_full_s) begin
+						state_next_s = IDLE;
+
+
+					end
+					else if ( data_axi_pulse_i && !data_in_axi_i[3] ) begin //if TX is ok, go to get data
 
 						state_next_s = GET_DATA_FROM_MEM;
 
 					end
+					else begin //if no data from axi, remain in check_tx
 
-					else begin
-
-						state_next_s = GET_DATA_FROM_MEM;
+						state_next_s = CHECK_TX;
 
 					end
 				end
