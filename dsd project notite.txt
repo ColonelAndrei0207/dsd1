@@ -26,7 +26,7 @@ i_o_mem:
 		
 
 i_o_axi:
-	momentan nimic (vezi GENERAL)
+	De actualizat cu noile comenzi care se primesc de la FSM; se va intarzia cererea de citire de adresa si instr/data a.i. sa se primeasca 16 biti pt adresa/instr si 32 biti de data
 
 mem_ctrl:
 	conectare module intre ele si i_o_mem cu exteriorul
