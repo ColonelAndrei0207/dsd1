@@ -1,9 +1,9 @@
-Modificari necesare la loading gen_reg (nu ma pot baza pe ideea de a avea in if semnale generate tot in acel bloc;
-	Eventual sa le mut in always_ff al fsm-ului, pare mai rezonabil acolo, avand deja command_received_s, mai ales ca se leaga, intr-un fel si de starile fsm-ului, eventual de bagat un mini-counter, a.i. sa se stie ca la READ_RX se parcurg elementele cerute
+DONE Modificari necesare la loading gen_reg (nu ma pot baza pe ideea de a avea in if semnale generate tot in acel bloc; 
+DONE	Eventual sa le mut in always_ff al fsm-ului, pare mai rezonabil acolo, avand deja command_received_s, mai ales ca se leaga, intr-un fel si de starile fsm-ului, eventual de bagat un mini-counter, a.i. sa se stie ca la READ_RX se parcurg elementele cerute
 
-De vazut daca e corect cum se incarca addr_received, cnt_received + incrementarea;
+TEORETIC DONE, DE VERIFICAT IN SIMULARE    De vazut daca e corect cum se incarca addr_received, cnt_received + incrementarea;
 de reverificat tranzitiile fsm a.i. sa ma asigur ca se citeste si se trimite corespunzator data din si catre memorie;
-de implementat verificarile pentru check_rx si check_tx (poate in fsm, poate in i_o_axi, de vazut)
+DONE de implementat verificarile pentru check_rx si check_tx (poate in fsm, poate in i_o_axi, de vazut)
 daca totul ok, de facut un mic tb dedicat mem_ctrl + memorie
 de facut modificari in risc a.i. sa se adapteze floating point + start/stop/halt primite de la mem_ctrl
 	(pt start/stop eventual clk gating; pt halt eventual fortare a semnalelor risc a.i. sa apara ca instructiunea ce se va procesa sa fie HALT)
@@ -17,9 +17,9 @@ GENERAL: pentru comenzi si toate cele sa adaug ori define ori parte din package 
 
 fsm:
 	
-	de facut bloc decrypt;
-	de facut bloc de incrementare a adresei pentru i_o_mem;
-	de implementat flag-uri a.i. sa se stie cand sa se trimita date catre i_o_axi sau i_o_mem
+	DONE de facut bloc decrypt;
+	DONE de facut bloc de incrementare a adresei pentru i_o_mem;
+	DONE de implementat flag-uri a.i. sa se stie cand sa se trimita date catre i_o_axi sau i_o_mem
 	
 i_o_mem:
 	momentan nimic (vezi GENERAL)
