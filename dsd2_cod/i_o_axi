@@ -84,7 +84,7 @@ module i_o_axi(
 
 			IDLE: begin
 
-				if( request_type_i!=`AXI_TX_WRITE  ) begin //TODO: aici se vor face modificarile in leg cu intarzierea
+				if( request_type_i!=`AXI_TX_WRITE  ) begin 
 
 					state_next_s = RD_ADDR;
 
@@ -99,7 +99,8 @@ module i_o_axi(
 				end
 			end
 
-			RD_ADDR: begin //TODO: modify based on request_type received form fsm
+			RD_ADDR: begin 
+							//TODO: find better implementation
 
 				if ( request_type_i == `AXI_RX_CHECK ) begin //if we want to check Rx FIFO status
 
@@ -107,13 +108,14 @@ module i_o_axi(
 					axi_if.ar_valid = 1;
 
 				end
-				else if (request_type_i == `AXI_RX_READ) begin //if status is ok and we get info from RX FIFO
+				else if ( (request_type_i == `AXI_RX_READ) || (request_type_i == `AXI_RX_ADDR) 
+						|| (request_type_i == `AXI_RX_CNT) || (request_type_i == `AXI_RX_INST) || (request_type_i == `AXI_RX_DATA) ) begin //if status is ok and we get info from RX FIFO
 
 					axi_if.ar_addr = `AXI_RX_FIFO_ADDR;
 					axi_if.ar_valid = 1;
 
 				end
-				else if (request_type_i == `AXI_TX_CHECK) begin //if we check for Tx FIFO status TODO: find better implementation
+				else if (request_type_i == `AXI_TX_CHECK) begin //if we check for Tx FIFO status 
 
 					axi_if.ar_addr = `AXI_STATUS_ADDR;
 					axi_if.ar_valid = 1;
@@ -197,6 +199,7 @@ module i_o_axi(
 					if(axi_if.b_resp == 0) begin //OKAY
 
 						axi_if.b_ready = 1;
+						
 
 					end
 
