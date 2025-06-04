@@ -41,12 +41,12 @@ module fsm_mem_ctrl(
 	localparam timer_value_2_bytes = 2*timer_value; //used now for testing
 	localparam timer_value_4_bytes = 4*timer_value; //used now for testing
 
-	logic [ $clog2(timer_value) : 0 ] idle_tmr_s;
+
+	logic [ $clog2(timer_value_4_bytes) : 0 ] idle_tmr_s;
+	logic tmr_flag_s;
 	logic [`UART_PAYLOAD - 1: 0] cnt_ctrl_s; //counter of the internal mem_ctrl
 	logic [`UART_PAYLOAD - 1: 0] cnt_received_s; //value received from the driver, representing the length in the command
 
-
-	logic [1:0] data_cnt; //mini-counter used to ensure that we fill-up the gen_reg with 32 bit data TODO: maybe modify the counter so that it waits more from the i_o_axi
 
 	//general register that stores the information received either from the memory or the driver
 	logic [ `D_BITS-1 : 0 ] gen_reg;
@@ -61,7 +61,7 @@ module fsm_mem_ctrl(
 	logic decrypt_get_s;
 	logic decrypt_data_s;
 	logic decrypt_instr_s;
-	logic decrypt_reset_s;
+	logic decrypt_reset_s;  
 	logic decrypt_halt_s;
 	logic decrypt_start_s;
 
@@ -72,7 +72,6 @@ module fsm_mem_ctrl(
 	logic command_received_s; //flag used to ensure that during read/write of data/inst we do not go back into the DECRYPT state
 	logic addr_received_s;
 	logic cnt_flag_received_s;
-	//logic cnt_value_received_s;
 
 
 	enum logic [ 2 : 0 ] {
@@ -106,31 +105,71 @@ module fsm_mem_ctrl(
 
 
 	//timer implementation for power reduction
-	//TODO: add specific limits also for addr/instr (2bytes to receive) and data (4bytes to receive)
 	always_ff @ (posedge sys_clk_i, negedge sys_reset_n_i) begin
 
 		if (!sys_reset_n_i) begin
 
 			idle_tmr_s <= 0;
+			tmr_flag_s <= 0;
 
 		end
 		else begin
-            
-            
-                        
-			if(idle_tmr_s == timer_value) begin
 
-				idle_tmr_s <= 0;
+			if (state_s == IDLE) begin
 
-			end else begin
+				tmr_flag_s <=0;
 
-				idle_tmr_s <= idle_tmr_s+1;
+				if ( ( command_order_cnt_s == 0 )  || (command_order_cnt_s == 2) ) begin //we want to get the command or the counter from the FIFO
+
+					if(idle_tmr_s == timer_value) begin
+
+						idle_tmr_s <= 0;
+						tmr_flag_s <=1;
+
+					end else begin
+
+						idle_tmr_s <= idle_tmr_s+1;
+
+					end
+				end
+				else if ( command_order_cnt_s == 1 ) begin //we want to get the addr (2 bytes)
+
+					if(idle_tmr_s == timer_value_2_bytes) begin
+
+						idle_tmr_s <= 0;
+						tmr_flag_s <=1;
+
+					end else begin
+
+						idle_tmr_s <= idle_tmr_s+1;
+
+					end
+
+				end
+				else begin
+
+					if(idle_tmr_s == timer_value_4_bytes) begin
+
+						idle_tmr_s <= 0;
+						tmr_flag_s <=1;
+
+					end else begin
+
+						idle_tmr_s <= idle_tmr_s+1;
+
+					end
+
+				end
+
 
 			end
-			
+			else begin
 
+				idle_tmr_s <= 0;
+				tmr_flag_s <= 0;
+
+			end
 		end
-
 	end
 
 	//always_ff block that decrypts the command received from the UART driver; based on the command, we can direct the FSM to it's proper state
@@ -151,10 +190,10 @@ module fsm_mem_ctrl(
 
 
 		end
-		else begin//TODO: think how to reset the flags when we get start/stop/halt
+		else begin
 
 			if (command_received_s) begin //if the command is received from the driver, start the decrypt, to set the flags
-    
+
 				case(gen_reg[`UART_PAYLOAD-1:0])
 
 					`RESET_RISC: begin //set a flag to reset the risc
@@ -272,10 +311,10 @@ module fsm_mem_ctrl(
 			cnt_flag_received_s <= 0;
 
 		end
-		else begin //TODO:find a way to safely load up the address (considering that it takes up 2 bytes of data) ->will do in i_o_axi
-//                  TODO: inside either the fsm or on i_o_axi find a way to ensure that 32 bits of data are received from the i_o_axi or the 16 bits for inst
+		else begin 
 
-			if(data_axi_pulse_i) begin //TODO: add extra conditions so that I can make sure that I load up the gen_reg with the address or the counter
+
+			if(data_axi_pulse_i) begin 
 
 				if(command_received_s && !decrypt_ok_s) begin
 
@@ -410,7 +449,8 @@ module fsm_mem_ctrl(
 				command_received_s <=1;
 
 			end
-			else if ( (cnt_ctrl_s == cnt_received_s) && ( cnt_received_s!=0 ) ) begin
+			else if ( (cnt_ctrl_s == cnt_received_s) && ( cnt_received_s!=0 ) || //if the counter value has been reached (when reading or writing data
+					(decrypt_reset_s | decrypt_halt_s | decrypt_start_s )   ) begin //or when the command directed to the RISC has been decrypted
 				//we reset the flag when the counter for the number of data/instruction to read/write reaches it's max value, different from 0(to ensure that we have actually received the counter)
 
 				command_received_s <=0;
@@ -420,7 +460,7 @@ module fsm_mem_ctrl(
 	end
 
 //fsm transitions
-	always_comb begin
+	always_comb begin 
 
 		state_next_s = state_s;
 		request_type_mem_o = 0;
@@ -439,7 +479,7 @@ module fsm_mem_ctrl(
 
 				IDLE: begin
 
-					if(idle_tmr_s == timer_value) begin //TODO: add extra flags to ensure that we actually go into check rx and not into check tx
+					if(tmr_flag_s) begin 
 
 						if(tx_full_s) begin //if we have tx fifo is full, and the timer ended, we will go back into check_tx, to ensure that we can continue to send data
 
@@ -453,7 +493,7 @@ module fsm_mem_ctrl(
 						end
 
 					end
-					else begin //TODO: add the transition from IDLE to CHECK_TX
+					else begin
 
 						state_next_s = IDLE;
 
@@ -508,9 +548,10 @@ module fsm_mem_ctrl(
 
 							end
 						end
-						else begin
+						else begin //in the case we do not have a pulse, but the command has been given, go back to idle
 
 							state_next_s = IDLE;
+							request_axi_type_o = `AXI_RX_CHECK;
 
 						end
 					end
@@ -533,12 +574,12 @@ module fsm_mem_ctrl(
 					end
 				end
 
-				READ_RX: begin //TODO: add conditions to make sure that we get out of READ_RX only when there is data to send (not only with the flags from decrypt, as they don't hold any other value)
+				READ_RX: begin 
 
 					if( (command_order_cnt_s == 4)  ) begin //here we are ready to send or receive data
 						if( decrypt_send_s && !decrypt_get_s && data_axi_pulse_i) begin //if we need to send data, only do it when gen_reg is loaded
 
-							if ( decrypt_data_s ) begin //if we send data TODO: add extra conditions to ensure that we have data to send
+							if ( decrypt_data_s ) begin //if we send data
 
 								request_type_mem_o = `MEM_DATA_WRITE;
 								data_out_mem_o = gen_reg;
@@ -594,6 +635,7 @@ module fsm_mem_ctrl(
 					else begin
 
 						state_next_s = SEND_DATA_TO_MEM;
+						request_type_mem_o = `MEM_DATA_WRITE;
 
 					end
 //                  end
@@ -606,18 +648,21 @@ module fsm_mem_ctrl(
 					if ( mem_ready_i ) begin
 
 						state_next_s = SEND_TX;
+						request_axi_type_o = `AXI_TX_WRITE;
 
 					end
 					else begin
 
 						state_next_s = GET_DATA_FROM_MEM;
+						request_type_mem_o = `MEM_DATA_READ;
 
 					end
 				end
 
 				SEND_TX: begin //TODO: think about somehow memorizing the data to be sent to axi (before WR_DATA we have WR_ADDR)
 
-					request_axi_type_o = `AXI_TX_WRITE;
+					
+					request_axi_type_o = `AXI_TX_CHECK;
 					data_out_axi_o = gen_reg;
 					state_next_s = CHECK_TX;
 
@@ -639,6 +684,8 @@ module fsm_mem_ctrl(
 					else begin //if no data from axi, remain in check_tx
 
 						state_next_s = CHECK_TX;
+						request_axi_type_o = `AXI_TX_CHECK;
+						data_out_axi_o = gen_reg;
 
 					end
 				end
