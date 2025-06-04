@@ -40,7 +40,8 @@ data_mem data_mem(
 	
 	
 	);
-	
+
+//TODO: add ways to implement HALT START and RESET commands, based on info from mem_ctrl
 processor RISC_core (
 	
 	
