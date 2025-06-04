@@ -1,3 +1,8 @@
+PT floating point:
+	De asigurat faptul ca imi merge bine procesarea (nu am probleme)
+	De implementat ideea de NaN
+
+
 DONE Modificari necesare la loading gen_reg (nu ma pot baza pe ideea de a avea in if semnale generate tot in acel bloc; 
 DONE	Eventual sa le mut in always_ff al fsm-ului, pare mai rezonabil acolo, avand deja command_received_s, mai ales ca se leaga, intr-un fel si de starile fsm-ului, eventual de bagat un mini-counter, a.i. sa se stie ca la READ_RX se parcurg elementele cerute
 
