@@ -7,7 +7,7 @@ DONE Modificari necesare la loading gen_reg (nu ma pot baza pe ideea de a avea i
 DONE	Eventual sa le mut in always_ff al fsm-ului, pare mai rezonabil acolo, avand deja command_received_s, mai ales ca se leaga, intr-un fel si de starile fsm-ului, eventual de bagat un mini-counter, a.i. sa se stie ca la READ_RX se parcurg elementele cerute
 
 TEORETIC DONE, DE VERIFICAT IN SIMULARE    De vazut daca e corect cum se incarca addr_received, cnt_received + incrementarea;
-de reverificat tranzitiile fsm a.i. sa ma asigur ca se citeste si se trimite corespunzator data din si catre memorie;
+TEORETIC DONE, DE VERIFICAT IN SIMULARE	   de reverificat tranzitiile fsm a.i. sa ma asigur ca se citeste si se trimite corespunzator data din si catre memorie;
 DONE de implementat verificarile pentru check_rx si check_tx (poate in fsm, poate in i_o_axi, de vazut)
 daca totul ok, de facut un mic tb dedicat mem_ctrl + memorie
 de facut modificari in risc a.i. sa se adapteze floating point + start/stop/halt primite de la mem_ctrl
