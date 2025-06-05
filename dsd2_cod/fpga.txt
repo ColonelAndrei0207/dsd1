@@ -8,13 +8,36 @@ it contains the UART driver, memory controller, memory and RISC core,
 
 module fpga(
 	
+	//sys interface (clk and reset)
+	input logic sys_clk_i,
+	input logic sys_reset_n_i,
+	
+	//connections with the PC
 	input logic rx_i,
 	output logic tx_o,
 	output logic interrupt_o
 	
 	);
 	
+	//axi interface
 	axi_lite_interface axi_if;
+
+    //interconection wires
+    
+    //mem_ctrl with data_mem
+    
+    
+    //mem_ctrl with instruction mem
+    logic [ `A_SIZE-1:0 ] mem_ctrl_instr_s;
+    logic mem_ctrl_instr_we_s;
+    
+    //memories with RISC core
+    logic [ `A_SIZE-1:0 ] instr_risc_s;
+    
+    
+    //assignation of the sys signals
+    assign axi_if.a_clk = sys_clk_i;
+    assign axi_if.a_reset_n = sys_reset_n_i;
 	
 //UART Driver SLAVE
 
@@ -27,23 +50,76 @@ module fpga(
 //mem_ctrl MASTER
 mem_ctrl ctrl_inst(
 	
-	.axi_if(axi_if.master)
-	
+	.axi_if(axi_if.master),
+
+	.data_in_i(),
+
+	.data_out_o(),
+	.addr_out_o(),
+	.data_we(),
+
+
+	.instr_addr_out_o(),
+	.instr_out_o(mem_ctrl_instr_s),
+	.instr_we(mem_ctrl_instr_we_s)	
 	);
 
-data_mem data_mem_inst(
 
+//MUX that transfers the data from data_mem either to mem_ctrl or to RISC core (to fufill data_in_i of mem_ctrl
+always_comb begin
+
+
+end
+
+//MUX that enables the writing/reading into data_mem, either from mem_ctrl or from RISC
+always_comb begin
+
+
+end
+
+
+//MUX that controls the addr of instruction_mem (either ProgramCounter or addr from mem_ctrl)
+always_comb begin
+
+
+end
+
+data_mem data_mem_inst(
+		.we,
+		
+		.clk_i(sys_clk_i),
+		.rst_n_i(sys_reset_n_i),
+		.data_in_i,
+		.addr_i,
+		.data_out_o
 
     );
     
 program_mem program_mem_inst (
-
+		.clk_i(sys_clk_i),
+		.rst_n_i(sys_reset_n_i),
+		.we(mem_ctrl_instr_we_s),
+		.instr_i(mem_ctrl_instr_s),
+		.instr_addr_i,
+		.instr_o(instr_risc_s)
 
     );
 	
 
 procesor risc_core_inst (
 
+		// general
+		.rst_i(sys_reset_n_i),   // active 0
+		.clk_i(sys_clk_i),
+		// program memory
+		.pc_o,
+		.instruction_i(instr_risc_s),
+		// data memory
+		.read_o,  // active 1
+		.write_o, // active 1
+		.address_o,
+		.data_in_i,
+		.data_out_o
 
     );
 
