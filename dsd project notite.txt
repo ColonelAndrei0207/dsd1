@@ -1,10 +1,14 @@
+Pt fpga.sv
+	De realizat blocul care genereaza semnalele de start,stop,halt pt RISC core;
+	De facut mux-ul pt addr instructiune (care s-ar lega de cum implementez semnalele de mai sus);
+
 PT floating point:
 	De asigurat faptul ca imi merge bine procesarea (nu am probleme)
 	De implementat ideea de NaN
 
 PT interconexiune module:
-	De rezolvat mux-urile notate;
-	De asigurat toate conexiunile 
+	~DONE	De rezolvat mux-urile notate; (mai este cel notat in fpga.sv)
+	DONE	De asigurat toate conexiunile 
 
 
 DONE Modificari necesare la loading gen_reg (nu ma pot baza pe ideea de a avea in if semnale generate tot in acel bloc; 
