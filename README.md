@@ -1,6 +1,8 @@
 # dsd1
 dsd1 project files
 
+pe drive am directorul de pe PC a.i. sa lucrez acasa
+
 notite actualizate: de facut frumos acest repo!!!!
 
 Notite partea a doua;
