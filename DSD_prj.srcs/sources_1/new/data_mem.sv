@@ -1,0 +1,48 @@
+/*
+
+ program memory file
+
+ */
+
+
+module data_mem (
+
+		input logic clk_i,
+		input logic rst_n_i,	
+
+		input logic we,
+	
+		input logic [`D_BITS-1:0] data_in_i,
+		input logic [`D_BITS-1:0] addr_i,
+		output logic [`D_BITS-1:0] data_out_o
+
+	);
+
+
+	logic [ `D_BITS-1 : 0 ] gen_data[ 0 : `MEM_SIZE ]; //declaration of the register array
+
+
+	always_ff @ (posedge clk_i, negedge rst_n_i)  begin
+
+        if(!rst_n_i) begin
+        
+        data_out_o <=0;
+        gen_data[addr_i] <=0;
+        
+        end
+        else begin
+		  if (!we) begin
+			
+			 data_out_o <= gen_data[addr_i];
+		
+		  end
+		  else begin
+		
+			 gen_data[addr_i] <= data_in_i;
+			
+		  end	
+		 end
+	end
+	
+
+endmodule   

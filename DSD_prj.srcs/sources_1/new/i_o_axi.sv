@@ -1,0 +1,231 @@
+/*
+
+ description of the i/o block towards the AXI interface
+
+
+ */
+
+/*TODO: think about a way to memorize in this module data (received from the axi or from the mem_ctrl)
+ if register is implemented, maybe think of a way to do a mini decryption so that the mem ctrl will receive at once the command addr and length
+ decryption: when receiving axi data, check how large is the payload (for example if 8 MSBs are valid and the rest of 16 not valid (zeros) the we only have the command)
+ if mini decryption is implemented maybe add outputs to the mem_ctrl so that the i_o can send directly the addr, length
+
+ */
+
+module i_o_axi(
+
+		//interface used to communicate with the driver
+		axi_lite_interface.master axi_if,
+
+
+		output logic data_sent_fsm, //output that sends a flag to indicate that data has been sent to the fsm
+
+		//input from the main fsm that takes and translates the request
+		input logic [`AXI_REQ_NR-1:0] request_type_i,
+
+		//data input and output to and from the main fsm (will transport each and every data received from the driver and
+		//will send memory data to the driver)
+		input logic [`D_BITS-1:0] data_in_i,
+		output logic [`D_BITS-1:0] data_out_o
+
+	);
+
+	enum logic [2:0] {
+		//reset state
+		IDLE        = 3'b000,
+
+		//states used when we receive info from driver
+		RD_ADDR     = 3'b001,
+		RD_DATA     = 3'b010,
+
+		//states used when we send info from driver
+		WR_ADDR     = 3'b011,
+		WR_DATA     = 3'b100,
+		WR_RESP     = 3'b101
+
+	} state_s, state_next_s;
+
+
+	always_ff @ (posedge axi_if.a_clk , negedge axi_if.a_reset_n) begin
+
+		if(!axi_if.a_reset_n) begin
+
+			state_s <= IDLE;
+
+		end
+		else begin
+
+			state_s <= state_next_s;
+
+		end
+	end
+
+	always_comb begin
+
+		state_next_s = state_s;
+		data_sent_fsm = 0;
+
+		axi_if.ar_addr = 0;
+		axi_if.ar_valid = 0;
+
+		axi_if.r_valid = 0;
+
+		axi_if.aw_addr = 0;
+		axi_if.aw_valid = 0;
+
+		axi_if.w_valid = 0;
+		axi_if.w_data = 0;
+
+		axi_if.b_ready = 0;
+
+		data_out_o = 0;
+
+		case(state_s)
+
+			IDLE: begin
+
+				if( request_type_i!=`AXI_TX_WRITE  ) begin 
+
+					state_next_s = RD_ADDR;
+
+				end
+				else if (request_type_i == `AXI_TX_WRITE) begin //write data to UART
+
+					state_next_s = WR_ADDR;
+
+				end
+				else begin
+					state_next_s = IDLE;
+				end
+			end
+
+			RD_ADDR: begin 
+							//TODO: find better implementation
+
+				if ( request_type_i == `AXI_RX_CHECK ) begin //if we want to check Rx FIFO status
+
+					axi_if.ar_addr = `AXI_STATUS_ADDR;
+					axi_if.ar_valid = 1;
+
+				end
+				else if ( (request_type_i == `AXI_RX_READ) || (request_type_i == `AXI_RX_ADDR) 
+						|| (request_type_i == `AXI_RX_CNT) || (request_type_i == `AXI_RX_INST) || (request_type_i == `AXI_RX_DATA) ) begin //if status is ok and we get info from RX FIFO
+
+					axi_if.ar_addr = `AXI_RX_FIFO_ADDR;
+					axi_if.ar_valid = 1;
+
+				end
+				else if (request_type_i == `AXI_TX_CHECK) begin //if we check for Tx FIFO status 
+
+					axi_if.ar_addr = `AXI_STATUS_ADDR;
+					axi_if.ar_valid = 1;
+
+				end
+				else begin
+
+					axi_if.ar_addr = 0;
+					axi_if.ar_valid = 0;
+
+				end
+
+				if (axi_if.ar_ready) begin
+
+					state_next_s = RD_DATA;
+
+				end
+				else begin
+
+					state_next_s = RD_ADDR;
+
+				end
+			end
+
+			RD_DATA: begin
+
+				if (axi_if.r_ready) begin
+
+					axi_if.r_valid = 1;
+					data_out_o = axi_if.r_data;
+					data_sent_fsm = 1;
+
+
+				end
+				else begin
+
+					state_next_s = RD_DATA;
+
+				end
+			end
+
+			WR_ADDR: begin
+
+				axi_if.aw_addr = `AXI_TX_FIFO_ADDR; //value for the Tx fifo address
+				axi_if.aw_valid = 1;
+
+				if (axi_if.aw_ready) begin
+
+					state_next_s = WR_DATA;
+
+				end
+				else begin
+
+					state_next_s = WR_ADDR;
+
+				end
+			end
+
+			WR_DATA: begin
+
+				axi_if.w_valid = 1;
+				axi_if.w_data = data_in_i;
+
+				if (axi_if.w_ready) begin
+
+					state_next_s = WR_RESP;
+
+				end
+				else begin
+
+					state_next_s = WR_DATA;
+				end
+			end
+
+			WR_RESP: begin
+
+				if ( axi_if.b_valid ) begin
+
+					state_next_s = IDLE;
+
+					if(axi_if.b_resp == 0) begin //OKAY
+
+						axi_if.b_ready = 1;
+						
+
+					end
+
+					else begin
+
+						data_out_o = 666; //rather random variable that will be used to signal an error to the main fsm
+
+					end
+				end
+				else begin
+
+					state_next_s = WR_RESP;
+
+				end
+
+			end
+
+
+			default: begin
+
+				state_next_s = IDLE;
+
+			end
+		endcase
+	end
+
+
+
+endmodule

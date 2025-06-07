@@ -1,0 +1,133 @@
+/*
+
+ description of the i/o block towards the memory;
+
+ it will act based on the info received from the main fsm:
+ it will receive a code that states in which memory we are writing (instruction or data)
+ the code will also state if a write operation or a read operation is done
+ it will receive the starting address in which it will write
+ based on the given address and the length of the data, it will increment the address
+
+
+ */
+
+
+module i_o_mem(
+
+		//system inputs
+		input logic sys_clk_i,
+		input logic sys_reset_n_i,
+
+		//interface linking the controller with the i_o_mem
+		input logic [`D_BITS-1:0] data_in_i,
+		input logic [`A_BITS-1:0] addr_in_i,
+		input logic [`MEM_REQ_NR-1:0] command_i,
+
+		output logic [`D_BITS-1:0] data_ctrl_o,
+		output logic data_sent,
+
+		//link with the data memory
+		input logic  [`D_BITS-1:0] data_mem_in_i,
+		output logic [`D_BITS-1:0] data_out_o,
+		output logic [`A_BITS-1:0] data_addr_out_o,
+		output logic data_we,
+
+		// link with the instruction memory
+		output logic [`A_BITS-1:0] instr_addr_out_o,
+		output logic [`A_SIZE-1:0] instr_out_o,
+		output logic instr_we
+
+	);
+
+	//intermediary wires
+	logic [`A_BITS-1:0] address_out_s;
+
+	//mini counter that calculates the address based on the information from the controller
+
+	always_ff @ (posedge sys_clk_i, negedge sys_reset_n_i) begin
+
+		if(!sys_reset_n_i) begin
+
+			address_out_s <= 0;
+
+		end
+		else begin
+			if (command_i == 0) begin
+
+				address_out_s <= addr_in_i;
+
+			end
+			else begin
+
+				address_out_s <= address_out_s + 1;
+
+			end
+		end
+	end
+
+
+	//transferring info to the data memory
+	always_ff @ (posedge sys_clk_i, negedge sys_reset_n_i) begin
+
+		if(!sys_reset_n_i) begin
+
+			data_we <=0 ;
+			data_out_o <= 0;
+			data_addr_out_o <= 0;
+			data_ctrl_o <=0;
+			data_sent <=0;
+
+		end
+		else begin
+
+			data_addr_out_o <= address_out_s; //pulled out of the if case because the address is sent anyway
+
+			if(command_i == `MEM_DATA_WRITE) begin //if we do a data WRITE
+
+				data_we <= 1;
+				data_out_o <= data_in_i;
+				
+			end
+			else begin
+				data_we <=0;
+
+					if(command_i == `MEM_DATA_READ) begin //else if we do a data READ
+
+						data_sent <= 1;
+						data_ctrl_o <= data_mem_in_i;
+
+				end
+			end
+		end
+	end
+
+	//transferring info to the intruction memory
+	always_ff @ (posedge sys_clk_i, negedge sys_reset_n_i) begin
+
+		if(!sys_reset_n_i) begin
+
+			instr_we <=0 ;
+			instr_out_o <= 0;
+			instr_addr_out_o <= 0;
+
+		end
+		else begin
+
+			if(command_i == `MEM_INST_WRITE) begin //if we want an instruction WRITE
+
+				instr_we <= 1;
+				instr_out_o <= data_in_i[`A_SIZE-1:0];
+				instr_addr_out_o <= address_out_s;
+
+			end
+			else begin
+
+				instr_we <=0;
+			
+			end
+		end
+	end
+
+
+
+endmodule

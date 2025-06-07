@@ -1,0 +1,110 @@
+`timescale 1ns/10ps
+
+/*
+ * Describes how the test will turn out
+ * In essence we generate the clock, perform a reset, and wait for the program memory to run out of instructions
+ * 
+ * TODO: add clever solutions to reduce the simulation time (if's to stop faster if a 'HALT' is detected)
+ */
+
+module processor_tb();
+
+	logic   rst;
+	logic   clk;
+	logic [`A_BITS-1:0]  pc;
+	logic  [15:0] instruction;
+	logic   read;
+	logic   write;
+	logic  [`A_BITS-1:0] address;
+	logic   [`D_BITS-1:0] data_in;
+	logic  [`D_BITS-1:0] data_out;
+
+
+	procesor DUT(
+
+		.rst_i(rst),
+		.clk_i(clk),
+		.pc_o(pc),
+		.instruction_i(instruction),
+		.read_o(read),
+		.write_o(write),
+		.address_o(address),
+		.data_in_i(data_in),
+		.data_out_o(data_out)
+	);
+
+	program_mem program_mem(
+
+		.instr_addr_i(pc),
+		.instr_o(instruction)
+
+	);
+
+	initial begin
+
+		clk = 0;
+
+		forever begin
+			#5 clk = ~clk;
+		end
+	end
+
+
+	initial begin //program memory writing
+
+
+	end
+
+
+	initial begin
+		rst = 1;
+		#10;
+		rst = 0;
+		#10;
+		rst = 1;
+		data_in = 95;
+
+/*
+		while(instruction) begin
+			if( instruction[15:11] == `LOAD_I ) begin
+
+				
+				#5;
+			end
+
+			if (instruction[15:9] == `HALT) begin
+				#50; 
+				$finish;
+			end
+			#5;
+		end
+*/
+		/*
+		 #10;
+
+		 instruction = {`LOADC, `R0, 8'd15};
+
+		 #40;
+
+		 instruction = {`LOADC, `R1, 8'd34};
+
+		 #40;
+
+		 instruction = {`ADD, `R0, `R0, `R1 };
+
+		 #40;
+
+		 instruction = {`STORE, `R1, `R0 };
+
+
+		 */
+
+		#450;
+
+		$finish;
+
+	end
+
+
+endmodule
+
