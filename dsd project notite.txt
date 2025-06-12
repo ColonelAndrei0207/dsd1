@@ -1,5 +1,6 @@
 Pt fpga.sv
 	De realizat blocul care genereaza semnalele de start,stop,halt pt RISC core;
+		De asigurat continuitatea semnalelor de start, reset, halt indifierent de ce se mai intampla in mem_ctrl
 	De facut mux-ul pt addr instructiune (care s-ar lega de cum implementez semnalele de mai sus);
 
 PT floating point:
