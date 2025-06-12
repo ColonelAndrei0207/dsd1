@@ -26,6 +26,8 @@ module mem_ctrl (
 		//axi interface with master modport
 		axi_lite_interface.master axi_if,
 
+		output logic [ `RISC_FLAG_NR-1:0 ]risc_flags_o,
+
 		//interface linking the controller with the data memory
 		input logic [`D_BITS-1:0] data_in_i,
 
@@ -73,6 +75,7 @@ module mem_ctrl (
 		.sys_clk_i(axi_if.a_clk),
 		.sys_reset_n_i(axi_if.a_reset_n),
 
+		.risc_flags_o(risc_flags_o),
 
 		.mem_ready_i(data_mem_pulse_s),
 
