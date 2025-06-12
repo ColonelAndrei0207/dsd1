@@ -21,6 +21,12 @@
  
    //mem_ctrl defines that i will use 
  
+  //risc_flags
+  `define RISC_FLAG_NR 2
+  `define START_FLAG `RISC_FLAG_NR-1'b01
+  `define RESET_FLAG `RISC_FLAG_NR-1'b10
+  `define HALT_FLAG `RISC_FLAG_NR-1'b11
+  
   //i_o_axi commands
   `define AXI_RX_CHECK `AXI_REQ_NR-1'd1
 
