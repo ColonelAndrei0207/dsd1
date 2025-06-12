@@ -97,10 +97,10 @@ module fsm_mem_ctrl(
 		GET_DATA_FROM_MEM = 5,
 
 		//send to i_o_axi the data from mem
-		SEND_TX = 5,
+		SEND_TX = 6,
 
 		//check for status, if TX NOT full, continue with another 4-byte data; else go to idle
-		CHECK_TX = 6
+		CHECK_TX = 7
 
 
 	} state_s, state_next_s;
@@ -295,11 +295,7 @@ module fsm_mem_ctrl(
 				risc_flags_o <= `START_FLAG;
 				
 			end
-			else begin
-				
-				risc_flags_o <= 0;
-				
-			end
+            //if the command is not START/STOP/HALT, we could have zeroed the flag; I chose not to in order to preserve the value, as it is going to be needed in the fpga module
 		end
 	end
 	
