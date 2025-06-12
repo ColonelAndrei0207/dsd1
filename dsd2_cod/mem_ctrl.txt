@@ -24,7 +24,7 @@
 module mem_ctrl (
 
 		//axi interface with master modport
-		axi_lite_interface.master axi_if,
+		axi_interface axi_interface_master, 
 
 		output logic [ `RISC_FLAG_NR-1:0 ]risc_flags_o,
 
@@ -57,11 +57,11 @@ module mem_ctrl (
 	logic [ `A_BITS-1 : 0] addr_mem_s;
 	
 	
-
+axi_lite_interface  axi_interface();
 
 	i_o_axi driver_connection_inst(
 
-		.axi_if(axi_if),
+		.axi_if(axi_interface_master),
 		.request_type_i(axi_request_type_s),
 		.data_sent_fsm(data_sent_fsm_s),
 
@@ -121,6 +121,5 @@ module mem_ctrl (
 
 
 endmodule
-
 
 
