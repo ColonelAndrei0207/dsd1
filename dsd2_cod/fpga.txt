@@ -43,7 +43,7 @@ module fpga(
     logic [ `D_BITS-1 : 0 ] risc_data_in_s;
     logic [ `D_BITS-1 : 0 ] risc_data_out_s;
     logic [ `A_BITS-1 : 0 ] risc_addr_s; 
-    logic [ `A_SIZE-1 : 0 ] risc_pc_s;
+    logic [ `A_BITS-1 : 0 ] risc_pc_s;
     
     
     //MUX output wires
@@ -58,7 +58,7 @@ module fpga(
     logic mem_data_we_s;
     
     //InstrAddr MUX
-    logic [ `A_SIZE-1 : 0 ] mem_instr_addr_s;
+    logic [ `A_BITS-1 : 0 ] mem_instr_addr_s;
     
     //assignation of the sys signals
     assign axi_if.a_clk = sys_clk_i;
