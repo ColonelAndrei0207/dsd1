@@ -45,7 +45,6 @@ module i_o_axi(
 
 	} state_s, state_next_s;
 
-
 	always_ff @ (posedge axi_if.a_clk , negedge axi_if.a_reset_n) begin
 
 		if(!axi_if.a_reset_n) begin
