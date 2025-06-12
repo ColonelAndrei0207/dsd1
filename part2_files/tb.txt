@@ -7,10 +7,6 @@
  * TODO: add clever solutions to reduce the simulation time (if's to stop faster if a 'HALT' is detected)
  */
 
-
- `include "/home/digdevel/training/nodm/default/units/spi_training/source/sv/rtl/procesor_etti/defines.svh"
-
-
 module processor_tb();
 
 	logic   rst;
@@ -22,27 +18,23 @@ module processor_tb();
 	logic  [`A_BITS-1:0] address;
 	logic   [`D_BITS-1:0] data_in;
 	logic  [`D_BITS-1:0] data_out;
+    
+    logic tx;
+    logic rx;
+    logic interrupt;
 
+    fpga DUT (
 
-	procesor DUT(
+    .sys_clk_i(clk),
+	.sys_reset_n_i(rst),
+	
+	//connections with the PC
+	.rx_i(rx),
+	.tx_o(tx),
+	.interrupt_o(interrupt)
+    
+    );
 
-		.rst_i(rst),
-		.clk_i(clk),
-		.pc_o(pc),
-		.instruction_i(instruction),
-		.read_o(read),
-		.write_o(write),
-		.address_o(address),
-		.data_in_i(data_in),
-		.data_out_o(data_out)
-	);
-
-	program_mem program_mem(
-
-		.instr_addr_i(pc),
-		.instr_o(instruction)
-
-	);
 
 	initial begin
 
@@ -51,12 +43,6 @@ module processor_tb();
 		forever begin
 			#5 clk = ~clk;
 		end
-	end
-
-
-	initial begin //program memory writing
-
-
 	end
 
 
