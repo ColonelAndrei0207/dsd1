@@ -20,9 +20,11 @@ module fpga(
 	);
 	
 	logic risc_clk_gate_s;
-	logic risc_rst_n_s;
+	logic risc_rst_n_s; //output of rst to the RISC
+	logic flag_rst_n_s; //2nd input of the AND gate -> will ensure that only the RISC resets (implicit value on 1)
+	
 	//axi interface
-	axi_lite_interface axi_if;
+	axi_lite_interface axi_if();
 
     //interconection wires
     
@@ -74,14 +76,35 @@ module fpga(
 
        axi_uartlite_0 UART_driver (
        
-       .* //pray it is ok
+    .s_axi_aclk(sys_clk_i),
+    .s_axi_aresetn(sys_reset_n_i),
+    .interrupt(interrupt_o),
+    .s_axi_awaddr(axi_if.slave.aw_addr),
+    .s_axi_awvalid(axi_if.slave.aw_valid),
+    .s_axi_awready(axi_if.slave.aw_ready),
+    .s_axi_wdata(axi_if.slave.w_data),
+    .s_axi_wstrb(axi_if.slave.w_strb),
+    .s_axi_wvalid(axi_if.slave.w_valid),
+    .s_axi_wready(axi_if.slave.w_ready),
+    .s_axi_bresp(axi_if.slave.b_resp),
+    .s_axi_bvalid(axi_if.slave.b_valid),
+    .s_axi_bready(axi_if.slave.b_ready),
+    .s_axi_araddr(axi_if.slave.ar_addr),
+    .s_axi_arvalid(axi_if.slave.ar_valid),
+    .s_axi_arready(axi_if.slave.ar_ready),
+    .s_axi_rdata(axi_if.slave.r_data),
+    .s_axi_rresp(axi_if.slave.r_resp),
+    .s_axi_rvalid(axi_if.slave.r_valid),
+    .s_axi_rready(axi_if.slave.r_ready),
+    .rx(rx_i),
+    .tx(tx_o)
        
        );
 
 //mem_ctrl MASTER
 mem_ctrl ctrl_inst(
 	
-	.axi_if(axi_if.master),
+	.axi_interface_master(axi_if.master ),
 
 	.risc_flags_o(risc_flags_s),
 	.data_in_i(mem_ctrl_data_in_s),
@@ -148,6 +171,7 @@ always_ff @( posedge sys_clk_i, negedge sys_reset_n_i  ) begin //TODO: think abo
 	if(!sys_reset_n_i) begin
 		
 		risc_clk_gate_s <= 0;
+		flag_rst_n_s <=1;
 		
 	end
 	else begin
@@ -164,9 +188,11 @@ always_ff @( posedge sys_clk_i, negedge sys_reset_n_i  ) begin //TODO: think abo
 		end
 		else if(risc_flags_s == `RESET_FLAG) begin
 			
-			risc_clk_gate_s <= 1;
+			flag_rst_n_s <=0;
+			risc_clk_gate_s <= 0;
 		
 		end
+		//only condition left is when flags == 0; in that case we maintain values of the signal
 	end
 	
 end
@@ -188,12 +214,20 @@ always_comb begin
 	end
 end
 
+    //adding a Xilinx BUFGCE primitive to ensure the clock gating to the RISC
+    BUFGCE bufgce_inst (
+        .I(sys_clock_i),          // Clock input
+        .CE(risc_clk_gate_s),     // Clock enable input
+        .O(risc_clk_s)            // Clock output
+    );
+
 
 //AND gate that generates the RISC clock signal, when we receive START from the mem_ctrl
 
-assign risc_clk_s = sys_clk_i & risc_clk_gate_s;
+//assign risc_clk_s = sys_clk_i & risc_clk_gate_s; //using an AND gate will force the output signal on logic "0" 
 
-//TODO: think about how to reset the RISC when asked by the mem_ctrl assign risc_rst_n_s = 
+//TODO: think about how to reset the RISC when asked by the mem_ctrl 
+    assign risc_rst_n_s = flag_rst_n_s & sys_reset_n_i;
 
 data_mem data_mem_inst(
 
