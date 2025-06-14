@@ -1,79 +1,86 @@
-/*
- AXI4_Lite interface used in the memory controller design
- It contains all of the signal used in the design (21 signals), with their respective bus size and name
- memory controller is considered a MASTER in this application
- it receives info from the UART driver and the memory
- */
+//------------------------------------------------------------------------------
+// AXI4‑Lite interface with internal regs for master outputs
+//  • Master (memory controller) drives aw_addr, aw_valid, etc.
+//  • Slave (UART) reads those via aw_addr_sig, aw_valid_sig, etc.
+//------------------------------------------------------------------------------
+interface axi_lite_interface ();
 
 
 
-interface axi_lite_interface(
+  // clock & reset
+  logic            a_clk;
+  logic            a_reset_n;
 
-		//global
+  // ------------------------------------------------------------
+  //  Internal registers (driven by the master FSM)
+  // ------------------------------------------------------------
+  logic [7:0] aw_addr;     // master-driven
+  logic                  aw_valid;   // master-driven
+  logic [32:0]           w_data;      // master-driven
+  logic [3:0]            w_strb;    // master-driven
+  logic                  w_valid;     // master-driven
+  logic                  b_ready;     // master-driven
+  logic [7:0]            ar_addr;     // master-driven
+  logic                  ar_valid;    // master-driven
+  logic                  r_ready;     // master-driven
 
-		logic a_clk,
-		logic a_reset_n,
+  // ------------------------------------------------------------
+  //  External nets (read by the slave) — continuous assigned
+  // ------------------------------------------------------------
+  logic [7:0]		 aw_addr_sig;
+  logic                  aw_valid_sig;
+  logic [32:0]		 w_data_sig;
+  logic [3:0] 		 w_strb_sig;
+  logic                  w_valid_sig;
+  logic                  b_ready_sig;
+  logic [7:0] 		 ar_addr_sig;
+  logic                  ar_valid_sig;
+  logic                  r_ready_sig;
 
-		//write address channel
+  // ------------------------------------------------------------
+  //  Slave-to-master nets (driven by the slave)
+  // ------------------------------------------------------------
+  logic                  aw_ready;
+  logic                  w_ready;
+  logic                  b_valid;
+  logic [1:0]            b_resp;
+  logic                  ar_ready;
+  logic [31:0] 		     r_data;
+  logic [1:0]            r_resp;
+  logic                  r_valid;
 
-		logic aw_valid,
-		logic aw_ready,
-		logic [7:0] aw_addr,
-		logic [2:0] aw_prot,
 
-		//write data channel    -> same as for the write address channel
+  // drive the external nets from the regs
+  assign aw_addr_sig  = aw_addr;
+  assign aw_valid_sig = aw_valid;
+  assign w_data_sig   = w_data;
+  assign w_strb_sig   = w_strb;
+  assign w_valid_sig  = w_valid;
+  assign b_ready_sig  = b_ready;
+  assign ar_addr_sig  = ar_addr;
+  assign ar_valid_sig = ar_valid;
+  assign r_ready_sig  = r_ready;
+  // ------------------------------------------------------------
+  //  Master modport:  
+  //   • Sees the *_sig nets as inputs  
+  //   • Sees the regs as outputs  
+  // ------------------------------------------------------------
+  modport master (
+    input  aw_ready, w_ready, b_valid, b_resp, ar_ready, r_data, r_resp, r_valid,
+    output aw_addr, aw_valid, w_data, w_strb, w_valid, b_ready, ar_addr, ar_valid, r_ready,
+    input  a_clk, a_reset_n
+  );
 
-		logic w_valid,
-		logic w_ready,
-		logic [31:0] w_data,
-		logic [3:0] w_strb,
+  // ------------------------------------------------------------
+  //  Slave modport:
+  //   • Sees the regs only as read‑only (via the *_sig nets)
+  //   • Drives the slave‑to‑master nets
+  // ------------------------------------------------------------
+  modport slave (
+    input  aw_addr_sig, aw_valid_sig, w_data_sig, w_strb_sig, w_valid_sig, b_ready_sig,
+           ar_addr_sig, ar_valid_sig, r_ready_sig,
+    output aw_ready, w_ready, b_valid, b_resp, ar_ready, r_data, r_resp, r_valid,
+    input  a_clk, a_reset_n
+  );
 
-		//write response channel
-
-		logic b_valid,
-		logic b_ready,
-		logic [1:0] b_resp,
-
-		//read address channel
-
-		logic ar_valid,
-		logic ar_ready,
-		logic [7:0] ar_addr,
-		logic [2:0] ar_prot,
-
-		//READ data channel
-
-		logic r_valid,
-		logic r_ready,
-		logic [31:0] r_data,
-		logic [1:0] r_resp
-	);
-	
-	
-	//modport for master (memory controller)
-	modport master (
-		
-		input aw_ready, w_ready, b_resp, ar_ready, r_data, r_resp, r_valid,
-		output aw_addr, aw_valid, w_data, w_strb, w_valid, b_ready, ar_addr, ar_valid, r_ready,
-		input a_clk, a_reset_n
-		
-		);
-	
-	
-	modport slave (
-		
-		input aw_addr, aw_valid, w_data, w_strb, w_valid, b_ready, ar_addr, ar_valid, r_ready,
-		output aw_ready, w_ready, b_resp, ar_ready, r_data, r_resp, r_valid,
-		input a_clk, a_reset_n		
-		
-		);
-	
-	
-	
-	//modport for slave (UART driver)
-	
 endinterface
-
-
-
-
