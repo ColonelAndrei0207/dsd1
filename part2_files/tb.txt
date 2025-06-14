@@ -11,6 +11,8 @@ module processor_tb();
 
 localparam baud_rate = 10000; //baud rate will be set based on the configured AXILite IP baud rate
 
+localparam baud-edge = baud_rate/2;
+
 localparam parity_bit = 0 //set as 0 if no parity bit is configured
 
 //TODO: extra parameters for the read/write byte tasks
@@ -64,9 +66,18 @@ task description:
 it will get as input the data byte, and transform the byte into a UART friendly tx signal;
 TODO: revise UART protocol to ensure proper sending of data
 */
-task write_byte(int datat_byte);
+task write_byte(int data_byte);
 
-   
+   tx = 1;
+   #2;
+   tx = 0; //start bit
+   #(baud_edge)
+   for (int i =0; i <8; i++) begin
+
+      tx = data_byte[i];
+      #(baud_edge);
+
+   end
 
 endtask
 
