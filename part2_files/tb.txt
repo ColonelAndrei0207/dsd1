@@ -9,16 +9,12 @@
 
 module processor_tb();
 
-	logic   rst;
-	logic   clk;
-	logic [`A_BITS-1:0]  pc;
-	logic  [15:0] instruction;
-	logic   read;
-	logic   write;
-	logic  [`A_BITS-1:0] address;
-	logic   [`D_BITS-1:0] data_in;
-	logic  [`D_BITS-1:0] data_out;
-    
+localparam baud_rate = 10000; //baud rate will be set based on the configured AXILite IP baud rate
+
+localparam parity_bit = 0 //set as 0 if no parity bit is configured
+
+//TODO: extra parameters for the read/write byte tasks
+
     logic tx;
     logic rx;
     logic interrupt;
@@ -34,7 +30,6 @@ module processor_tb();
 	.interrupt_o(interrupt)
     
     );
-
 
 	initial begin
 
@@ -52,42 +47,8 @@ module processor_tb();
 		rst = 0;
 		#10;
 		rst = 1;
-		data_in = 95;
-
-/*
-		while(instruction) begin
-			if( instruction[15:11] == `LOAD_I ) begin
-
-				
-				#5;
-			end
-
-			if (instruction[15:9] == `HALT) begin
-				#50; 
-				$finish;
-			end
-			#5;
-		end
-*/
-		/*
-		 #10;
-
-		 instruction = {`LOADC, `R0, 8'd15};
-
-		 #40;
-
-		 instruction = {`LOADC, `R1, 8'd34};
-
-		 #40;
-
-		 instruction = {`ADD, `R0, `R0, `R1 };
-
-		 #40;
-
-		 instruction = {`STORE, `R1, `R0 };
-
-
-		 */
+		
+//start of task call
 
 		#450;
 
@@ -98,3 +59,24 @@ module processor_tb();
 
 endmodule
 
+/* write_byte task
+task description:
+it will get as input the data byte, and transform the byte into a UART friendly tx signal;
+TODO: revise UART protocol to ensure proper sending of data
+*/
+task write_byte(int datat_byte);
+
+   
+
+endtask
+
+
+/* read_byte task
+task description: 
+it will make sure that the data received on rx
+*/
+
+task read_byte();
+
+
+endtask
