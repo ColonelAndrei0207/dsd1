@@ -5,7 +5,6 @@ it contains the UART driver, memory controller, memory and RISC core,
 
 */
 
-
 module fpga(
 	
 	//sys interface (clk and reset)
@@ -76,30 +75,41 @@ module fpga(
 
        axi_uartlite_0 UART_driver (
        
-    .s_axi_aclk(sys_clk_i),
-    .s_axi_aresetn(sys_reset_n_i),
-    .interrupt(interrupt_o),
-    .s_axi_awaddr(axi_if.slave.aw_addr),
-    .s_axi_awvalid(axi_if.slave.aw_valid),
-    .s_axi_awready(axi_if.slave.aw_ready),
-    .s_axi_wdata(axi_if.slave.w_data),
-    .s_axi_wstrb(axi_if.slave.w_strb),
-    .s_axi_wvalid(axi_if.slave.w_valid),
-    .s_axi_wready(axi_if.slave.w_ready),
-    .s_axi_bresp(axi_if.slave.b_resp),
-    .s_axi_bvalid(axi_if.slave.b_valid),
-    .s_axi_bready(axi_if.slave.b_ready),
-    .s_axi_araddr(axi_if.slave.ar_addr),
-    .s_axi_arvalid(axi_if.slave.ar_valid),
-    .s_axi_arready(axi_if.slave.ar_ready),
-    .s_axi_rdata(axi_if.slave.r_data),
-    .s_axi_rresp(axi_if.slave.r_resp),
-    .s_axi_rvalid(axi_if.slave.r_valid),
-    .s_axi_rready(axi_if.slave.r_ready),
-    .rx(rx_i),
-    .tx(tx_o)
-       
-       );
+    .s_axi_aclk    (axi_if.a_clk),
+    .s_axi_aresetn (axi_if.a_reset_n),
+    .interrupt     (interrupt_o),
+
+    // Write address channel
+    .s_axi_awaddr  (axi_if.aw_addr_sig),
+    .s_axi_awvalid (axi_if.aw_valid_sig),
+    .s_axi_awready (axi_if.aw_ready),
+
+    // Write data channel
+    .s_axi_wdata   (axi_if.w_data_sig),
+    .s_axi_wstrb   (axi_if.w_strb_sig),
+    .s_axi_wvalid  (axi_if.w_valid_sig),
+    .s_axi_wready  (axi_if.w_ready),
+
+    // Write response channel
+    .s_axi_bresp   (axi_if.b_resp),
+    .s_axi_bvalid  (axi_if.b_valid),
+    .s_axi_bready  (axi_if.b_ready_sig),
+
+    // Read address channel
+    .s_axi_araddr  (axi_if.ar_addr_sig),
+    .s_axi_arvalid (axi_if.ar_valid_sig),
+    .s_axi_arready (axi_if.ar_ready),
+
+    // Read data channel
+    .s_axi_rdata   (axi_if.r_data),
+    .s_axi_rresp   (axi_if.r_resp),
+    .s_axi_rvalid  (axi_if.r_valid),
+    .s_axi_rready  (axi_if.r_ready_sig),
+
+    // UART signals
+    .rx            (rx_i),
+    .tx            (tx_o)
+);
 
 //mem_ctrl MASTER
 mem_ctrl ctrl_inst(
@@ -121,23 +131,23 @@ mem_ctrl ctrl_inst(
 
 
 //MUX that transfers the data+address from data_mem either to mem_ctrl or to RISC core (to fufill data_in_i of mem_ctrl
+
+assign mem_data_in_s = (risc_read_s | risc_write_s) ? risc_data_out_s : mem_ctrl_data_out_s;
+assign mem_addr_s = (risc_read_s | risc_write_s) ? risc_addr_s : mem_ctrl_data_addr_s;
+
 always_comb begin
 
-    mem_data_out_s = 0;
-    mem_data_in_s = 0;
-        
+    risc_data_in_s = 0;
+    mem_ctrl_data_in_s = 0;
+    
     if( risc_read_s | risc_write_s ) begin //if the RISC core comunicates with data mem
     
-        mem_data_out_s = risc_data_in_s; //the output of the data mem will link to the data input of RISC
-        mem_data_in_s = risc_data_out_s; //the input of the data mem will link to the data output of the RISC
-        mem_addr_s = risc_addr_s; //address of the RISC will link to the address input of the data mem
+       risc_data_in_s = mem_data_out_s; //the output of the data mem will link to the data input of RISC
     
     end
     else begin //else it means that the mem_ctrl will communicate with the data mem
     
-        mem_data_out_s = mem_ctrl_data_in_s;
-        mem_data_in_s = mem_ctrl_data_out_s;        
-        mem_addr_s = mem_ctrl_data_addr_s;
+       mem_ctrl_data_in_s = mem_data_out_s;
         
     end
 
