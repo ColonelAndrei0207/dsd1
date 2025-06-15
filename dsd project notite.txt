@@ -1,3 +1,4 @@
+În testbench de facut un fel de 'foreach' care sa reprezinte comanda mea ce se trimite. Comanda va respecta formatul dat in assignment
 De facut un testbench mai de doamne ajuta 
 
 NEW: Vezi pe chat ce solutie a gasit pt rezolvarea problemelor cu interfata
