@@ -66,28 +66,53 @@ task description:
 it will get as input the data byte, and transform the byte into a UART friendly tx signal;
 TODO: revise UART protocol to ensure proper sending of data
 */
-task write_byte(int data_byte);
+task write_byte(input [7:0] data_byte);
+    int i;
+    begin
+        // Start bit (logic 0)
+        rx = 1'b0;
+        #(baud_rate);
 
-   tx = 1;
-   #2;
-   tx = 0; //start bit
-   #(baud_edge)
-   for (int i =0; i <8; i++) begin
+        // Data bits (LSB first)
+        for (i = 0; i < 8; i = i + 1) begin
+            rx = data_byte[i];
+            #(baud_rate);
+        end
 
-      tx = data_byte[i];
-      #(baud_edge);
-
-   end
-
+        // Stop bit (logic 1)
+        rx = 1'b1;
+        #(baud_rate);
+    end
 endtask
-
 
 /* read_byte task
 task description: 
 it will make sure that the data received on rx
 */
 
-task read_byte();
+task read_byte(output [7:0] data_byte);
+    integer i;
+    begin
+        // Wait for start bit (logic 0)
+        @(negedge tx); // Trigger on falling edge = start bit
+        #(baud_rate / 2); // Wait half a bit period to sample in the middle of the start bit
+        if (tx !== 1'b0) begin
+            $display("ERROR: Start bit not valid");
+            data_byte = 8'hXX;
+            return;
+        end
 
+        // Sample data bits (LSB first)
+        for (i = 0; i < 8; i = i + 1) begin
+            #(baud_rate);
+            data_byte[i] = tx;
+        end
 
+        // Wait and sample stop bit
+        #(baud_rate);
+        if (tx !== 1'b1) begin
+            $display("ERROR: Stop bit not valid");
+        end
+    end
 endtask
+
