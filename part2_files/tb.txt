@@ -11,12 +11,12 @@ module processor_tb();
 
 localparam baud_rate = 10000; //baud rate will be set based on the configured AXILite IP baud rate
 
-localparam baud-edge = baud_rate/2;
-
-localparam parity_bit = 0 //set as 0 if no parity bit is configured
+localparam parity_bit = 0; //set as 0 if no parity bit is configured
 
 //TODO: extra parameters for the read/write byte tasks
 
+    logic clk;
+    logic rst;
     logic tx;
     logic rx;
     logic interrupt;
@@ -66,7 +66,7 @@ task description:
 it will get as input the data byte, and transform the byte into a UART friendly tx signal;
 TODO: revise UART protocol to ensure proper sending of data
 */
-task write_byte(input [7:0] data_byte);
+task write_byte(input [7:0] data_byte, output rx, input int baud_rate);
     int i;
     begin
         // Start bit (logic 0)
@@ -90,7 +90,7 @@ task description:
 it will make sure that the data received on rx
 */
 
-task read_byte(output [7:0] data_byte);
+task read_byte(output [7:0] data_byte, input tx, input int baud_rate);
     integer i;
     begin
         // Wait for start bit (logic 0)
@@ -116,3 +116,54 @@ task read_byte(output [7:0] data_byte);
     end
 endtask
 
+
+
+task write_packet(
+    input  [7:0] command,
+    input  [15:0] addr,
+    input  [7:0] cnt,
+    input  [31:0] data[] // dynamic array of 32-bit words
+);
+    integer i;
+    begin
+        // Send command
+        write_byte(command);
+
+        // Send 2-byte address (MSB first)
+        write_byte(addr[15:8]); // high byte
+        write_byte(addr[7:0]);  // low byte
+
+        // Send count
+        write_byte(cnt);
+
+        // Send cnt number of 4-byte data words (MSB first)
+        for (i = 0; i < cnt; i = i + 1) begin
+            write_byte(data[i][31:24]); // byte 3 (MSB)
+            write_byte(data[i][23:16]); // byte 2
+            write_byte(data[i][15:8]);  // byte 1
+            write_byte(data[i][7:0]);   // byte 0 (LSB)
+        end
+    end
+endtask
+
+
+task read_packet(
+    input  int cnt,
+    output logic [31:0] data[] // dynamic array to store received 4-byte words
+);
+    integer i;
+    logic [7:0] byte0, byte1, byte2, byte3;
+    begin
+        data = new[cnt]; // resize output array to cnt elements
+
+        for (i = 0; i < cnt; i = i + 1) begin
+            // Read 4 bytes (MSB first)
+            read_byte(byte3); // MSB
+            read_byte(byte2);
+            read_byte(byte1);
+            read_byte(byte0); // LSB
+
+            data[i] = {byte3, byte2, byte1, byte0};
+        end
+    end
+endtask
