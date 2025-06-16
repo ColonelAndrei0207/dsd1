@@ -1,3 +1,5 @@
+De aranjat / recreat proiectul a.i. sa nu am probleme cand simulez (momentan imi simuleaza fpga, nu tb-ul)
+
 În testbench de facut un fel de 'foreach' care sa reprezinte comanda mea ce se trimite. Comanda va respecta formatul dat in assignment
 De facut un testbench mai de doamne ajuta 
 
