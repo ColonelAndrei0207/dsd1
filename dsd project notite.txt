@@ -1,3 +1,6 @@
+BUG: conexiune proasta intre r_ready IP cu r_ready al interfetei; de verificat
+
+
 Modificat macro-urile a.i. sa se faca in package
 
 De aranjat / recreat proiectul a.i. sa nu am probleme cand simulez (momentan imi simuleaza fpga, nu tb-ul)
